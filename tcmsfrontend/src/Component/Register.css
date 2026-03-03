@@ -1,0 +1,269 @@
+/* Register Container */
+.register-container {
+  min-height: 100vh;
+  background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+    url('https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=2022') center/cover no-repeat;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Navbar */
+.navbar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 15px 50px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+  color: white;
+  font-size: 20px;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.navbar-menu {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+}
+
+.navbar-menu a {
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  transition: opacity 0.3s;
+}
+
+.navbar-menu a:hover {
+  opacity: 0.8;
+}
+
+.login-nav-btn {
+  background: white;
+  color: #667eea;
+  border: none;
+  font-weight: 600;
+  height: 36px;
+  padding: 0 24px;
+}
+
+.login-nav-btn:hover {
+  background: #f0f0f0 !important;
+  color: #667eea !important;
+}
+
+/* Register Content */
+.register-content {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+/* Register Box */
+.register-box {
+  background: white;
+  padding: 40px 50px;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 700px;
+}
+
+.register-title {
+  text-align: center;
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+  color: #333;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.register-subtitle {
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 30px;
+  letter-spacing: 0.5px;
+}
+
+/* Steps */
+.register-steps {
+  margin-bottom: 30px;
+}
+
+.register-steps .ant-steps-item-process .ant-steps-item-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+}
+
+.register-steps .ant-steps-item-finish .ant-steps-item-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+}
+
+.register-steps .ant-steps-item-finish .ant-steps-icon {
+  color: white;
+}
+
+/* Form Styling */
+.register-form {
+  margin-top: 20px;
+}
+
+.steps-content {
+  min-height: 300px;
+  padding: 20px 0;
+}
+
+.ant-form-item-label > label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.ant-input,
+.ant-input-password,
+.ant-select-selector,
+.ant-input-textarea {
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+}
+
+.ant-input:focus,
+.ant-input-password:focus,
+.ant-select-focused .ant-select-selector,
+.ant-input-textarea:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+/* Steps Action Buttons */
+.steps-action {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+}
+
+.register-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  height: 45px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+.register-button:hover {
+  background: linear-gradient(135deg, #5568d3 0%, #65408b 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Register Footer */
+.register-footer {
+  text-align: center;
+  margin-top: 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+.register-footer a {
+  color: #667eea;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.register-footer a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 15px 20px;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .navbar-menu {
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .register-box {
+    padding: 30px 25px;
+    margin: 20px;
+  }
+
+  .register-title {
+    font-size: 32px;
+  }
+
+  .register-subtitle {
+    font-size: 12px;
+  }
+
+  .steps-content {
+    min-height: 250px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-menu a {
+    font-size: 12px;
+  }
+
+  .register-box {
+    padding: 25px 20px;
+  }
+
+  .register-title {
+    font-size: 28px;
+  }
+
+  .register-steps {
+    margin-bottom: 20px;
+  }
+
+  .steps-action {
+    flex-direction: column;
+  }
+
+  .steps-action button {
+    width: 100%;
+  }
+}
+
+/* Ant Design Steps Override */
+.ant-steps-item-process > .ant-steps-item-container > .ant-steps-item-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.ant-steps-item-finish .ant-steps-item-icon > .ant-steps-icon {
+  color: white;
+}
+
+/* Select Dropdown */
+.ant-select-dropdown {
+  border-radius: 8px;
+}
+
+/* Disabled state */
+.ant-select-disabled.ant-select:not(.ant-select-customize-input) .ant-select-selector {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
