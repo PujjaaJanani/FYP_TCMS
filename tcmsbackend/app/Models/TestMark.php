@@ -40,16 +40,17 @@ class TestMark extends Model
         'testName',
         'testDate',
         'registrationId',
+        'classId'
     ];
 
     /**
-     * Get the attributes that should be cast.
+     * The attributes that should be cast.
      *
-     * @return array<string, string>
+     * @var array<string, string>
      */
     protected $casts = [
         'testDate' => 'date',
-        'mark' => 'float',
+        'mark' => 'float'
     ];
 
     /**
@@ -58,5 +59,105 @@ class TestMark extends Model
     public function registration()
     {
         return $this->belongsTo(Registration::class, 'registrationId', 'registrationId');
+    }
+
+    /**
+     * Get the class for this test mark.
+     */
+    public function class()
+    {
+        return $this->belongsTo(ClassModel::class, 'classId', 'classId');
+    }
+
+    /**
+     * Get the student through registration.
+     */
+    public function student()
+    {
+        return $this->hasOneThrough(
+            Student::class,
+            Registration::class,
+            'registrationId',
+            'studentId',
+            'registrationId',
+            'studentId'
+        );
+    }
+
+    /**
+     * Check if mark is passing (>= 50).
+     */
+    public function isPassing()
+    {
+        return $this->mark >= 50;
+    }
+
+    /**
+     * Get the grade for this mark.
+     */
+    public function getGradeAttribute()
+    {
+        if ($this->mark >= 90) return 'A+';
+        if ($this->mark >= 80) return 'A';
+        if ($this->mark >= 70) return 'B';
+        if ($this->mark >= 60) return 'C';
+        if ($this->mark >= 50) return 'D';
+        return 'F';
+    }
+
+    /**
+     * Scope a query to only include marks for a specific class.
+     */
+    public function scopeForClass($query, $classId)
+    {
+        return $query->where('classId', $classId);
+    }
+
+    /**
+     * Scope a query to only include a specific test.
+     */
+    public function scopeForTest($query, $testName, $testDate)
+    {
+        return $query->where('testName', $testName)
+                     ->where('testDate', $testDate);
+    }
+
+    /**
+     * Scope a query to only include marks above a threshold.
+     */
+    public function scopeAbove($query, $threshold)
+    {
+        return $query->where('mark', '>=', $threshold);
+    }
+
+    /**
+     * Scope a query to only include marks below a threshold.
+     */
+    public function scopeBelow($query, $threshold)
+    {
+        return $query->where('mark', '<', $threshold);
+    }
+
+    /**
+     * Get all unique tests for a class.
+     */
+    public static function getUniqueTestsForClass($classId)
+    {
+        return self::where('classId', $classId)
+            ->select('testName', 'testDate')
+            ->distinct()
+            ->orderBy('testDate', 'desc')
+            ->get();
+    }
+
+    /**
+     * Calculate average for a test.
+     */
+    public static function calculateTestAverage($classId, $testName, $testDate)
+    {
+        return self::where('classId', $classId)
+            ->where('testName', $testName)
+            ->where('testDate', $testDate)
+            ->avg('mark');
     }
 }

@@ -25,6 +25,7 @@ import StaffClasses from '../StudyMaterial/StaffClasses';
 import StaffMaterials from '../StudyMaterial/StaffMaterials';
 import AddMaterial from '../StudyMaterial/AddMaterial';
 import EditMaterial from '../StudyMaterial/EditMaterial';
+import StaffTestMarks from '../StudyMaterial/StaffTestMarks';
 import StudentClasses from '../StudyMaterial/StudentClasses';
 import StudentMaterials from '../StudyMaterial/StudentMaterials';
 
@@ -84,6 +85,8 @@ const ContentArea = () => {
             <Route path="/admin/schedule" element={<ViewClassSchedule />} />
             <Route path="/admin/schedule/add" element={<AddClassSchedule />} />
             <Route path="/admin/schedule/edit/:classId" element={<EditClassSchedule />} />
+            <Route path="/staff/testmarks/class/:classId" element={<StaffTestMarks />} />
+            
 
             {/* Student Routes (uncomment when ready) */}
             {/* <Route path="/student/dashboard" element={<StudentDashboard />} /> */}

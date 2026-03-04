@@ -7,7 +7,7 @@ use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\StudyMaterialController;
-
+use App\Http\Controllers\TestMarkController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -93,6 +93,19 @@ Route::get('/test', function() {
     Route::delete('/study-materials/{id}', [StudyMaterialController::class, 'deleteMaterial']);
     Route::get('/student/study-materials/my-classes', [StudyMaterialController::class, 'getStudentClasses']);
     
+    // Test Marks Management
+    Route::prefix('testmarks')->group(function () {
+        Route::get('/class/{classId}', [TestMarkController::class, 'getClassTests']);
+        Route::get('/class/{classId}/students', [TestMarkController::class, 'getClassStudents']);
+        Route::get('/{markId}', [TestMarkController::class, 'show']);
+        Route::post('/', [TestMarkController::class, 'store']);
+        Route::put('/{classId}/{testName}/{testDate}', [TestMarkController::class, 'update']);
+        Route::delete('/{classId}/{testName}/{testDate}', [TestMarkController::class, 'destroy']);
+        
+        // Debug routes
+        Route::get('/debug', [TestMarkController::class, 'debugStudent']);
+    });
+
 });
 
 // Preflight OPTIONS requests - Simplified CORS handling
