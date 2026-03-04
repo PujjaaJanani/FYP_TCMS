@@ -28,6 +28,8 @@ import EditMaterial from '../StudyMaterial/EditMaterial';
 import StaffTestMarks from '../StudyMaterial/StaffTestMarks';
 import StudentClasses from '../StudyMaterial/StudentClasses';
 import StudentMaterials from '../StudyMaterial/StudentMaterials';
+import RecordAttendance from '../Attendance/RecordAttendance';
+import StaffAttendance from '../Attendance/StaffAttendance';
 
 // Admin Pages (uncomment when ready)
 // import AdminDashboard from '../Pages/AdminDashboard';
@@ -78,6 +80,9 @@ const ContentArea = () => {
             <Route path="/staff/materials/class/:classId" element={<StaffMaterials />} />
             <Route path="/staff/materials/add" element={<AddMaterial />} />
             <Route path="/staff/materials/edit/:materialId" element={<EditMaterial />} />
+            <Route path="/staff/testmarks/class/:classId" element={<StaffTestMarks />} />
+            <Route path="/staff/attendance" element={<StaffAttendance />} />
+            <Route path="/staff/attendance/class/:classId" element={<RecordAttendance />} />
 
             {/* Admin Routes (uncomment when ready) */}
             {/* <Route path="/admin/dashboard" element={<AdminDashboard />} /> */}
@@ -85,8 +90,6 @@ const ContentArea = () => {
             <Route path="/admin/schedule" element={<ViewClassSchedule />} />
             <Route path="/admin/schedule/add" element={<AddClassSchedule />} />
             <Route path="/admin/schedule/edit/:classId" element={<EditClassSchedule />} />
-            <Route path="/staff/testmarks/class/:classId" element={<StaffTestMarks />} />
-            
 
             {/* Student Routes (uncomment when ready) */}
             {/* <Route path="/student/dashboard" element={<StudentDashboard />} /> */}

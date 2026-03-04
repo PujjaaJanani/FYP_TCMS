@@ -11,6 +11,7 @@ import {
   TeamOutlined,
   LogoutOutlined,
   ProfileOutlined,
+  CheckSquareOutlined 
 } from '@ant-design/icons';
 import { getUserType, getRole, clearAuth } from '../Utils/LocalStorage';
 
@@ -43,9 +44,10 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     getItem('Profile',        'staff-2', <UserOutlined />,     () => navigate('/staff/profile')),
     getItem('Class Schedule', 'staff-3', <CalendarOutlined />, () => navigate('/staff/schedule')),
     getItem('Registrations',  'staff-4', <ProfileOutlined />,  () => navigate('/staff/registrations')),
-    getItem('Payment',        'staff-5', <DollarOutlined />,   () => navigate('/staff/payment')),
-    getItem('Study Material', 'staff-6', <BookOutlined />,     () => navigate('/staff/materials')),
-    getItem('Logout',         'staff-7', <LogoutOutlined />,   () => {
+    getItem('Attendance',     'staff-5', <CheckSquareOutlined  />,  () => navigate('/staff/attendance')),
+    getItem('Payment',        'staff-6', <DollarOutlined />,   () => navigate('/staff/payment')),
+    getItem('Study Material', 'staff-7', <BookOutlined />,     () => navigate('/staff/materials')),
+    getItem('Logout',         'staff-8', <LogoutOutlined />,   () => {
       clearAuth();
       navigate('/login');
     }),

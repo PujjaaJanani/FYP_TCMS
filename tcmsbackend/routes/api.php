@@ -8,6 +8,8 @@ use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\StudyMaterialController;
 use App\Http\Controllers\TestMarkController;
+use App\Http\Controllers\AttendanceController;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -104,6 +106,16 @@ Route::get('/test', function() {
         
         // Debug routes
         Route::get('/debug', [TestMarkController::class, 'debugStudent']);
+    });
+
+    // Attendance Management
+    Route::prefix('attendance')->group(function () {
+        Route::get('/my-classes', [AttendanceController::class, 'getMyClasses']);
+        Route::get('/class/{classId}/students', [AttendanceController::class, 'getClassStudents']);
+        Route::post('/submit', [AttendanceController::class, 'submitAttendance']);
+        Route::get('/class/{classId}/history', [AttendanceController::class, 'getClassAttendanceHistory']);
+        Route::get('/class/{classId}/date/{date}', [AttendanceController::class, 'getAttendanceByDate']);
+        Route::delete('/class/{classId}/date/{date}', [AttendanceController::class, 'deleteAttendanceByDate']); 
     });
 
 });
