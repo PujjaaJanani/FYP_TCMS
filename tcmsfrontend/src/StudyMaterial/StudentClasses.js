@@ -50,24 +50,74 @@ const StudentClasses = () => {
     }
   }, [isStudent]);
 
-  // Rich, solid colors - good contrast with white text
+  // Rich, solid colors - EXACT SAME ORDER as StaffClasses.js
   const classColors = [
-    '#C41E3A', '#1E4C7A', '#2E5C4A', '#8B4513', '#4A2C6D',
-    '#B22222', '#2A5C6E', '#7D3C1B', '#1E3A5F', '#5D3A1A',
-    '#4A6D8C', '#7C4D2E', '#3A5F5F', '#8B0000', '#2F4F4F',
-    '#6B4F3C', '#4A6B4A', '#7B3F3F', '#2C5F5F', '#6A4E3A',
-    '#3A5F7A', '#8B5A2B', '#4A6B8C', '#7A4A3F', '#9B2C2C',
-    '#0B4F6C', '#4A704A', '#8B5F5F', '#4A3F6B', '#6B4A3F'
+    '#C41E3A', // Crimson Red
+    '#1E4C7A', // Deep Blue
+    '#2E5C4A', // Forest Green
+    '#8B4513', // Saddle Brown
+    '#4A2C6D', // Royal Purple
+    '#B22222', // Fire Brick
+    '#2A5C6E', // Teal
+    '#7D3C1B', // Rust
+    '#1E3A5F', // Navy
+    '#5D3A1A', // Dark Brown
+    '#4A6D8C', // Steel Blue
+    '#7C4D2E', // Coffee
+    '#3A5F5F', // Dark Slate
+    '#8B0000', // Dark Red
+    '#2F4F4F', // Dark Slate Gray
+    '#6B4F3C', // Taupe
+    '#4A6B4A', // Sage Green
+    '#7B3F3F', // Rosewood
+    '#2C5F5F', // Deep Teal
+    '#6A4E3A', // Umber
+    '#3A5F7A', // Slate Blue
+    '#8B5A2B', // Golden Brown
+    '#4A6B8C', // Denim
+    '#7A4A3F', // Terracotta
+    '#9B2C2C', // Deep Red
+    '#0B4F6C', // Dark Cyan
+    '#4A704A', // Moss Green
+    '#8B5F5F', // Dusty Rose
+    '#4A3F6B', // Deep Lavender
+    '#6B4A3F', // Sepia
+    '#2C5F5F', // Pine Green
+    '#8B3F3F', // Brick Red
+    '#3F6B8B', // Steel Blue
+    '#6B8B3F', // Olive
+    '#8B6B3F', // Bronze
+    '#4A2C2C', // Maroon
+    '#2C4A4A', // Deep Teal
+    '#6B4A6B', // Plum
+    '#4A6B6B', // Slate
+    '#8B4A2C', // Terracotta
+    '#2C4A2C', // Forest
+    '#6B2C4A', // Berry
+    '#4A2C6B', // Indigo
+    '#8B6B4A', // Tan
+    '#2C6B6B', // Cyan
+    '#6B4A2C', // Copper
+    '#4A6B2C', // Leaf Green
+    '#8B2C4A', // Raspberry
+    '#2C2C6B', // Midnight Blue
+    '#6B2C6B', // Purple
   ];
 
   const getClassColor = (classItem) => {
+    // Create a unique string combining multiple properties including classId for uniqueness
     const colorKey = `${classItem.subjectName}-${classItem.form}-${classItem.classId}`;
+    
+    // Use djb2 hashing algorithm for better distribution
     let hash = 5381;
     for (let i = 0; i < colorKey.length; i++) {
-      hash = ((hash << 5) + hash) + colorKey.charCodeAt(i);
-      hash = hash & hash;
+      hash = ((hash << 5) + hash) + colorKey.charCodeAt(i); // hash * 33 + c
+      hash = hash & hash; // Convert to 32-bit integer
     }
+    
+    // Use absolute value and modulo to get index
     const index = Math.abs(hash) % classColors.length;
+    
     return classColors[index];
   };
 
@@ -109,7 +159,8 @@ const StudentClasses = () => {
       overflow: 'hidden',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
-      border: '2px solid transparent'
+      border: '2px solid transparent',
+      position: 'relative'
     },
     classCardBody: {
       padding: '20px',

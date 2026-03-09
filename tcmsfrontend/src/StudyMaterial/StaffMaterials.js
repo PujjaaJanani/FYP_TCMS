@@ -294,7 +294,7 @@ const StaffMaterials = () => {
                         onClick={() => handleDownload(material)}
                         style={{ background: '#1890ff', borderColor: '#1890ff' }}
                       >
-                        {material.fileType === 'link' ? 'Open' : 'Download'}
+                        {material.fileType === 'link' ? 'Open' : 'Open'}
                       </Button>
                       <Button
                         size="small"

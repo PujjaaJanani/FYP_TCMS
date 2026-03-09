@@ -264,8 +264,7 @@ const StudentMaterials = () => {
                       onClick={() => handleDownload(material)}
                       style={{ background: classColor, borderColor: classColor }}
                     >
-                      {material.fileType === 'link' ? 'Open' : 
-                       material.fileType === 'zip' ? 'Download' : 'Download'}
+                      {material.fileType === 'link' ? 'Open' : 'Open'}
                     </Button>
                   </div>
                 ))}
