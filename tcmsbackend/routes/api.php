@@ -10,7 +10,8 @@ use App\Http\Controllers\StudyMaterialController;
 use App\Http\Controllers\TestMarkController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\ProfileController;
 
 /*
 |--------------------------------------------------------------------------
@@ -140,13 +141,19 @@ Route::get('/test', function() {
     });
 
     Route::prefix('users')->group(function () {
-        Route::get('/', [UserManagementController::class, 'getAllUsers']);
-        Route::get('/{userType}/{id}', [UserManagementController::class, 'getUser']);
-        Route::post('/', [UserManagementController::class, 'createUser']);
-        Route::put('/{userType}/{id}', [UserManagementController::class, 'updateUser']);
-        Route::delete('/{userType}/{id}', [UserManagementController::class, 'deleteUser']);
-        Route::get('/student/{studentId}/registration', [UserManagementController::class, 'getStudentRegistration']);
+        Route::get('/', [UserController::class, 'getAllUsers']);
+        Route::get('/{userType}/{id}', [UserController::class, 'getUser']);
+        Route::post('/', [UserController::class, 'createUser']);
+        Route::put('/{userType}/{id}', [UserController::class, 'updateUser']);
+        Route::delete('/{userType}/{id}', [UserController::class, 'deleteUser']);
+        Route::get('/student/{studentId}/registration', [UserController::class, 'getStudentRegistration']);
     });
+
+    // Profile Management
+    Route::get('/profile', [ProfileController::class, 'getProfile']);
+    Route::put('/profile', [ProfileController::class, 'updateProfile']);
+    Route::post('/profile/upload-picture', [ProfileController::class, 'uploadProfilePicture']);
+    Route::delete('/profile/delete-picture', [ProfileController::class, 'deleteProfilePicture']);
 
 });
 

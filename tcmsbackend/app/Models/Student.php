@@ -20,6 +20,7 @@ class Student extends Authenticatable
         'password',
         'phone',
         'address',
+        'profilePicture',
         'authorityId',
     ];
 
@@ -27,6 +28,7 @@ class Student extends Authenticatable
         'password',
     ];
 
+    // Relationships
     public function authority()
     {
         return $this->belongsTo(Authority::class, 'authorityId', 'authorityId');

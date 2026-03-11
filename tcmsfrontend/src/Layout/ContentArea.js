@@ -16,7 +16,7 @@ import Register from '../Component/Register';
 import ViewApplications from '../Applications/ViewApplications';
 // Uncomment when you create these pages
 // import StaffDashboard from '../Pages/StaffDashboard';
-// import StaffProfile from '../Pages/StaffProfile';
+import ViewProfile from '../UserAccount/ViewProfile';
 import ViewClassSchedule from '../ClassSchedule/ViewClassSchedule';
 import AddClassSchedule from '../ClassSchedule/AddClassSchedule';
 import EditClassSchedule from '../ClassSchedule/EditClassSchedule';
@@ -39,7 +39,6 @@ import EditUser from '../UserAccount/EditUser';
 
 // Student Pages (uncomment when ready)
 // import StudentDashboard from '../Pages/StudentDashboard';
-// import StudentProfile from '../Pages/StudentProfile';
 import StudentPayment from '../Payment/StudentPayment';
 
 const { Content } = Layout;
@@ -74,7 +73,7 @@ const ContentArea = () => {
             {/* Staff Routes */}
             <Route path="/staff/applications" element={<ViewApplications />} />
             {/* <Route path="/staff/dashboard" element={<StaffDashboard />} /> */}
-            {/* <Route path="/staff/profile" element={<StaffProfile />} /> */}
+            <Route path="/profile" element={<ViewProfile />} />
             <Route path="/authority/schedule" element={<ViewClassSchedule />} />
             <Route path="/authority/schedule/add" element={<AddClassSchedule />} />
             <Route path="/authority/schedule/edit/:classId" element={<EditClassSchedule />} />
@@ -100,7 +99,6 @@ const ContentArea = () => {
 
             {/* Student Routes (uncomment when ready) */}
             {/* <Route path="/student/dashboard" element={<StudentDashboard />} /> */}
-            {/* <Route path="/student/profile" element={<StudentProfile />} /> */}
             <Route path="/student/schedule" element={<ViewClassSchedule />} />
             <Route path="/student/payment" element={<StudentPayment />} />
             <Route path="/student/materials" element={<StudentClasses />} />

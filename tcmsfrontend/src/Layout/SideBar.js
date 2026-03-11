@@ -31,7 +31,7 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
   const adminItems = [
     getItem('Home',            'admin-1', <HomeOutlined />,     () => navigate('/admin/dashboard')),
     getItem('User Management', 'admin-2', <TeamOutlined />,     () => navigate('/admin/users')),
-    getItem('Class Schedule',  'admin-3', <CalendarOutlined />, () => navigate('/admin/schedule')),
+    getItem('Class Schedule',  'admin-3', <CalendarOutlined />, () => navigate('/authority/schedule')),
     getItem('Logout',          'admin-4', <LogoutOutlined />,   () => {
       clearAuth();
       navigate('/login');
@@ -41,11 +41,11 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
   // ── Staff menu ────────────────────────────────────────────────
   const staffItems = [
     getItem('Home',           'staff-1', <HomeOutlined />,     () => navigate('/staff/dashboard')),
-    getItem('Profile',        'staff-2', <UserOutlined />,     () => navigate('/staff/profile')),
-    getItem('Class Schedule', 'staff-3', <CalendarOutlined />, () => navigate('/staff/schedule')),
-    getItem('Registrations',  'staff-4', <ProfileOutlined />,  () => navigate('/staff/registrations')),
+    getItem('Profile',        'staff-2', <UserOutlined />,     () => navigate('/profile')),
+    getItem('Class Schedule', 'staff-3', <CalendarOutlined />, () => navigate('/authority/schedule')),
+    getItem('Registrations',  'staff-4', <ProfileOutlined />,  () => navigate('/staff/applications')),
     getItem('Attendance',     'staff-5', <CheckSquareOutlined  />,  () => navigate('/staff/attendance')),
-    getItem('Payment',        'staff-6', <DollarOutlined />,   () => navigate('/staff/payment')),
+    getItem('Payment',        'staff-6', <DollarOutlined />,   () => navigate('/staff/payments')),
     getItem('Study Material', 'staff-7', <BookOutlined />,     () => navigate('/staff/materials')),
     getItem('Logout',         'staff-8', <LogoutOutlined />,   () => {
       clearAuth();
@@ -56,7 +56,7 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
   // ── Student menu ──────────────────────────────────────────────
   const studentItems = [
     getItem('Home',           'student-1', <HomeOutlined />,     () => navigate('/student/dashboard')),
-    getItem('Profile',        'student-2', <UserOutlined />,     () => navigate('/student/profile')),
+    getItem('Profile',        'student-2', <UserOutlined />,     () => navigate('/profile')),
     getItem('Class Schedule', 'student-3', <CalendarOutlined />, () => navigate('/student/schedule')),
     getItem('Payment',        'student-4', <DollarOutlined />,   () => navigate('/student/payment')),
     getItem('Study Material', 'student-5', <BookOutlined />,     () => navigate('/student/materials')),
