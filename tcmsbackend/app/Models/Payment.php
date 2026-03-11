@@ -2,83 +2,89 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Payment extends Model
 {
-    use HasFactory;
-
-    /**
-     * The table associated with the model.
-     *
-     * @var string
-     */
     protected $table = 'payment';
-
-    /**
-     * The primary key associated with the table.
-     *
-     * @var string
-     */
     protected $primaryKey = 'paymentId';
-
-    /**
-     * Indicates if the model should be timestamped.
-     *
-     * @var bool
-     */
     public $timestamps = false;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
+    // Allow mass assignment
     protected $fillable = [
         'amount',
+        'datePaid',
         'method',
         'paymentStatus',
         'receiptUrl',
         'remark',
         'registrationId',
+        'transactionId'
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
+    // Make ALL attributes accessible (no restrictions)
+    protected $guarded = [];
+    
+    // Cast types
     protected $casts = [
         'datePaid' => 'datetime',
         'amount' => 'float',
+        'paymentId' => 'integer',
+        'registrationId' => 'integer'
     ];
 
-    /**
-     * Get the registration for this payment.
-     */
+    // Make sure all attributes are visible
+    protected $hidden = [];
+
+    // Accessor methods to ensure properties are accessible
+    public function getPaymentIdAttribute($value)
+    {
+        return $value;
+    }
+
+    public function getAmountAttribute($value)
+    {
+        return (float)$value;
+    }
+
+    public function getDatePaidAttribute($value)
+    {
+        return $value;
+    }
+
+    public function getMethodAttribute($value)
+    {
+        return $value;
+    }
+
+    public function getPaymentStatusAttribute($value)
+    {
+        return $value;
+    }
+
+    public function getReceiptUrlAttribute($value)
+    {
+        return $value;
+    }
+
+    public function getRemarkAttribute($value)
+    {
+        return $value;
+    }
+
+    public function getRegistrationIdAttribute($value)
+    {
+        return $value;
+    }
+
+    public function getTransactionIdAttribute($value)
+    {
+        return $value;
+    }
+
+    // Relationships
     public function registration()
     {
         return $this->belongsTo(Registration::class, 'registrationId', 'registrationId');
-    }
-
-    /**
-     * Check if the payment is paid.
-     *
-     * @return bool
-     */
-    public function isPaid()
-    {
-        return $this->paymentStatus === 'Paid';
-    }
-
-    /**
-     * Check if the payment is pending.
-     *
-     * @return bool
-     */
-    public function isPending()
-    {
-        return $this->paymentStatus === 'Pending';
     }
 }
