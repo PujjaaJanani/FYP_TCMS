@@ -165,7 +165,7 @@ const ViewClassSchedule = () => {
           <Button
             size="small"
             icon={<EditOutlined />}
-            onClick={() => navigate(`/staff/schedule/edit/${c.classId}`)}
+            onClick={() => navigate(`/authority/schedule/edit/${c.classId}`)}
           />
           <Button
             size="small"
@@ -206,7 +206,7 @@ const ViewClassSchedule = () => {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => navigate('/staff/schedule/add')}
+              onClick={() => navigate('/authority/schedule/add')}
               style={{ background: '#52c41a', borderColor: '#52c41a' }}
             >
               Add Class

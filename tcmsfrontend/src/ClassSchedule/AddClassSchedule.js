@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Form, Input, Select, TimePicker, Button, Card, message, Typography, Flex, Row, Col,
-  Modal, Space, Tabs
+  Modal, Space, InputNumber, Table, Popconfirm
 } from 'antd';
 import { 
   ArrowLeftOutlined, 
@@ -10,7 +10,10 @@ import {
   PlusOutlined,
   BookOutlined,
   UserOutlined,
-  TeamOutlined
+  TeamOutlined,
+  DollarOutlined,
+  EditOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -19,7 +22,6 @@ import { getToken } from '../Utils/LocalStorage';
 
 const { Title } = Typography;
 const { Option } = Select;
-const { TabPane } = Tabs;
 
 const AddClassSchedule = () => {
   const [form] = Form.useForm();
@@ -27,13 +29,16 @@ const AddClassSchedule = () => {
   const [subjects, setSubjects] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
+  const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] = useState(false);
   const [isTeacherModalVisible, setIsTeacherModalVisible] = useState(false);
-  const [newSubject, setNewSubject] = useState({ name: '', form: '' });
+  const [newSubject, setNewSubject] = useState({ name: '', form: '', subjectFee: 0 });
+  const [editingSubject, setEditingSubject] = useState(null);
   const [newTeacher, setNewTeacher] = useState({ name: '', email: '', phone: '', password: '' });
   const [tempSubjects, setTempSubjects] = useState([]);
   const [tempTeachers, setTempTeachers] = useState([]);
   const [nextTempId, setNextTempId] = useState(-1);
   const [creatingTeacher, setCreatingTeacher] = useState(false);
+  const [updatingSubject, setUpdatingSubject] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -67,7 +72,12 @@ const AddClassSchedule = () => {
 
   const handleAddNewSubject = () => {
     if (!newSubject.name || !newSubject.form) {
-      message.error('Please fill in both subject name and form');
+      message.error('Please fill in subject name and form');
+      return;
+    }
+
+    if (!newSubject.subjectFee || newSubject.subjectFee <= 0) {
+      message.error('Please enter a valid subject fee');
       return;
     }
 
@@ -81,7 +91,7 @@ const AddClassSchedule = () => {
       message.warning('This subject already exists');
       form.setFieldsValue({ subjectId: existingSubject.subjectId });
       setIsSubjectModalVisible(false);
-      setNewSubject({ name: '', form: '' });
+      setNewSubject({ name: '', form: '', subjectFee: 0 });
       return;
     }
 
@@ -90,6 +100,7 @@ const AddClassSchedule = () => {
       subjectId: nextTempId,
       name: newSubject.name,
       form: newSubject.form,
+      subjectFee: newSubject.subjectFee,
       isTemp: true
     };
 
@@ -98,9 +109,80 @@ const AddClassSchedule = () => {
     form.setFieldsValue({ subjectId: tempSubject.subjectId });
     
     setIsSubjectModalVisible(false);
-    setNewSubject({ name: '', form: '' });
+    setNewSubject({ name: '', form: '', subjectFee: 0 });
     
     message.success('New subject added to the list');
+  };
+
+  const handleEditSubject = (subject) => {
+    setEditingSubject(subject);
+    setIsEditSubjectModalVisible(true);
+  };
+
+  const handleUpdateSubject = async () => {
+    if (!editingSubject.name || !editingSubject.form) {
+      message.error('Please fill in subject name and form');
+      return;
+    }
+
+    if (!editingSubject.subjectFee || editingSubject.subjectFee <= 0) {
+      message.error('Please enter a valid subject fee');
+      return;
+    }
+
+    // Check if it's a temporary subject
+    if (editingSubject.isTemp) {
+      // Update temporary subject
+      setTempSubjects(tempSubjects.map(s => 
+        s.subjectId === editingSubject.subjectId ? editingSubject : s
+      ));
+      message.success('Subject updated successfully');
+      setIsEditSubjectModalVisible(false);
+      setEditingSubject(null);
+      return;
+    }
+
+    // Update permanent subject via API
+    setUpdatingSubject(true);
+    try {
+      const res = await axios.put(
+        `http://localhost:8000/api/subjects/${editingSubject.subjectId}`,
+        {
+          name: editingSubject.name,
+          form: editingSubject.form,
+          subjectFee: editingSubject.subjectFee
+        },
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      );
+
+      if (res.data.success) {
+        message.success('Subject updated successfully');
+        // Update subjects list
+        setSubjects(subjects.map(s => 
+          s.subjectId === editingSubject.subjectId ? { ...s, ...editingSubject } : s
+        ));
+        setIsEditSubjectModalVisible(false);
+        setEditingSubject(null);
+      }
+    } catch (err) {
+      console.error('Failed to update subject:', err);
+      message.error(err.response?.data?.message || 'Failed to update subject');
+    } finally {
+      setUpdatingSubject(false);
+    }
+  };
+
+  const handleDeleteSubject = (subjectId) => {
+    // Check if it's a temporary subject
+    const isTemp = subjectId < 0;
+    
+    if (isTemp) {
+      setTempSubjects(tempSubjects.filter(s => s.subjectId !== subjectId));
+      message.success('Subject removed from list');
+    } else {
+      // For permanent subjects, you might want to add a delete API endpoint
+      message.warning('Permanent subjects cannot be deleted here. Use subject management page.');
+    }
   };
 
   const handleAddNewTeacher = async () => {
@@ -184,11 +266,12 @@ const AddClassSchedule = () => {
         authorityId: values.authorityId,
       };
 
-      // If it's a temporary subject, send newSubject data
+      // If it's a temporary subject, send newSubject data with fee
       if (isTempSubject && tempSubjectData) {
         requestData.newSubject = {
           name: tempSubjectData.name,
-          form: tempSubjectData.form
+          form: tempSubjectData.form,
+          subjectFee: tempSubjectData.subjectFee
         };
       } else {
         requestData.subjectId = selectedSubjectId;
@@ -202,7 +285,7 @@ const AddClassSchedule = () => {
 
       if (res.data.success) {
         message.success('Class created successfully!');
-        navigate('/staff/schedule');
+        navigate('/authority/schedule');
       }
     } catch (err) {
       console.error('Failed to create class:', err);
@@ -212,25 +295,57 @@ const AddClassSchedule = () => {
     }
   };
 
-  // Custom dropdown render for subjects
+  // Custom dropdown render for subjects with edit button
   const renderSubjectDropdown = (menu) => (
     <>
       {menu}
       <div style={{ 
         display: 'flex', 
-        alignItems: 'center', 
-        padding: '8px',
+        flexDirection: 'column',
         borderTop: '1px solid #e8e8e8',
         marginTop: 4
       }}>
-        <Button 
-          type="text" 
-          icon={<PlusOutlined />} 
-          onClick={() => setIsSubjectModalVisible(true)}
-          style={{ width: '100%', justifyContent: 'flex-start' }}
-        >
-          Add New Subject
-        </Button>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          padding: '8px',
+          borderBottom: '1px dashed #e8e8e8'
+        }}>
+          <Button 
+            type="text" 
+            icon={<PlusOutlined />} 
+            onClick={() => setIsSubjectModalVisible(true)}
+            style={{ width: '100%', justifyContent: 'flex-start' }}
+          >
+            Add New Subject
+          </Button>
+        </div>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          padding: '8px'
+        }}>
+          <Button 
+            type="text" 
+            icon={<EditOutlined />} 
+            onClick={() => {
+              const selectedId = form.getFieldValue('subjectId');
+              if (selectedId) {
+                const subject = allSubjects.find(s => s.subjectId === selectedId);
+                if (subject) {
+                  handleEditSubject(subject);
+                } else {
+                  message.warning('Please select a subject first');
+                }
+              } else {
+                message.warning('Please select a subject first');
+              }
+            }}
+            style={{ width: '100%', justifyContent: 'flex-start' }}
+          >
+            Edit Selected Subject
+          </Button>
+        </div>
       </div>
     </>
   );
@@ -273,7 +388,7 @@ const AddClassSchedule = () => {
       <div style={{ marginBottom: 16 }}>
         <Button
           icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/staff/schedule')}
+          onClick={() => navigate('/authority/schedule')}
         >
           Back to Schedule
         </Button>
@@ -312,7 +427,7 @@ const AddClassSchedule = () => {
                   >
                     <Select 
                       placeholder="Select subject or add new"
-                      popupRender={renderSubjectDropdown}
+                      dropdownRender={renderSubjectDropdown}
                       getPopupContainer={(trigger) => trigger.parentElement}
                       showSearch
                       optionFilterProp="children"
@@ -320,19 +435,24 @@ const AddClassSchedule = () => {
                     >
                       {allSubjects.map(s => (
                         <Option key={s.subjectId} value={s.subjectId}>
-                          <Space>
-                            <BookOutlined />
-                            {s.name} - {s.form}
-                            {s.isTemp && (
-                              <span style={{ 
-                                color: '#52c41a', 
-                                fontSize: '12px',
-                                marginLeft: 4,
-                                fontStyle: 'italic'
-                              }}>
-                                (New)
-                              </span>
-                            )}
+                          <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                            <Space>
+                              <BookOutlined />
+                              <span>{s.name} - {s.form}</span>
+                              {s.isTemp && (
+                                <span style={{ 
+                                  color: '#52c41a', 
+                                  fontSize: '12px',
+                                  marginLeft: 4,
+                                  fontStyle: 'italic'
+                                }}>
+                                  (New)
+                                </span>
+                              )}
+                            </Space>
+                            {/* <div style={{ fontSize: '12px', color: '#52c41a' }}>
+                              Fee: RM {s.subjectFee?.toFixed(2) || '0.00'}
+                            </div> */}
                           </Space>
                         </Option>
                       ))}
@@ -390,7 +510,7 @@ const AddClassSchedule = () => {
                   >
                     <Select 
                       placeholder="Select teacher or add new"
-                      popupRender={renderTeacherDropdown}
+                      dropdownRender={renderTeacherDropdown}
                       getPopupContainer={(trigger) => trigger.parentElement}
                       showSearch
                       optionFilterProp="children"
@@ -426,7 +546,7 @@ const AddClassSchedule = () => {
                         Create Class
                       </Button>
                       <Button 
-                        onClick={() => navigate('/staff/schedule')}
+                        onClick={() => navigate('/authority/schedule')}
                         style={{ minWidth: 100 }}
                       >
                         Cancel
@@ -451,12 +571,12 @@ const AddClassSchedule = () => {
         open={isSubjectModalVisible}
         onCancel={() => {
           setIsSubjectModalVisible(false);
-          setNewSubject({ name: '', form: '' });
+          setNewSubject({ name: '', form: '', subjectFee: 0 });
         }}
         footer={[
           <Button key="cancel" onClick={() => {
             setIsSubjectModalVisible(false);
-            setNewSubject({ name: '', form: '' });
+            setNewSubject({ name: '', form: '', subjectFee: 0 });
           }}>
             Cancel
           </Button>,
@@ -464,7 +584,7 @@ const AddClassSchedule = () => {
             key="create"
             type="primary"
             onClick={handleAddNewSubject}
-            style={{ background: '#3b1fa3', borderColor: '#3b1fa3' }}
+            style={{ background: '#52c41a', borderColor: '#52c41a' }}
           >
             Add to List
           </Button>
@@ -479,6 +599,7 @@ const AddClassSchedule = () => {
               size="large"
             />
           </Form.Item>
+          
           <Form.Item label="Form/Level" required>
             <Select
               placeholder="Select form"
@@ -492,10 +613,104 @@ const AddClassSchedule = () => {
               ))}
             </Select>
           </Form.Item>
+
+          <Form.Item label="Subject Fee (RM)" required>
+            <InputNumber
+              placeholder="e.g., 150.00"
+              value={newSubject.subjectFee}
+              onChange={(value) => setNewSubject({ ...newSubject, subjectFee: value })}
+              size="large"
+              min={0}
+              step={10}
+              precision={2}
+              style={{ width: '100%' }}
+              // prefix={<DollarOutlined />}
+            />
+          </Form.Item>
+
           <Typography.Text type="secondary">
             The subject will be added to the dropdown immediately and saved when you create the class.
           </Typography.Text>
         </Form>
+      </Modal>
+
+      {/* Edit Subject Modal */}
+      <Modal
+        title={
+          <Space>
+            <EditOutlined style={{ color: '#3b1fa3' }} />
+            <span>Edit Subject</span>
+          </Space>
+        }
+        open={isEditSubjectModalVisible}
+        onCancel={() => {
+          setIsEditSubjectModalVisible(false);
+          setEditingSubject(null);
+        }}
+        footer={[
+          <Button key="cancel" onClick={() => {
+            setIsEditSubjectModalVisible(false);
+            setEditingSubject(null);
+          }}>
+            Cancel
+          </Button>,
+          <Button
+            key="update"
+            type="primary"
+            loading={updatingSubject}
+            onClick={handleUpdateSubject}
+            style={{ background: '#52c41a', borderColor: '#52c41a' }}
+          >
+            Update Subject
+          </Button>
+        ]}
+      >
+        {editingSubject && (
+          <Form layout="vertical">
+            <Form.Item label="Subject Name" required>
+              <Input
+                placeholder="e.g., Mathematics, Physics, Chemistry"
+                value={editingSubject.name}
+                onChange={(e) => setEditingSubject({ ...editingSubject, name: e.target.value })}
+                size="large"
+              />
+            </Form.Item>
+            
+            <Form.Item label="Form/Level" required>
+              <Select
+                placeholder="Select form"
+                value={editingSubject.form}
+                onChange={(value) => setEditingSubject({ ...editingSubject, form: value })}
+                size="large"
+                getPopupContainer={(trigger) => trigger.parentElement}
+              >
+                {['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5'].map(f => (
+                  <Option key={f} value={f}>{f}</Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item label="Subject Fee (RM)" required>
+              <InputNumber
+                placeholder="e.g., 150.00"
+                value={editingSubject.subjectFee}
+                onChange={(value) => setEditingSubject({ ...editingSubject, subjectFee: value })}
+                size="large"
+                min={0}
+                step={10}
+                precision={2}
+                style={{ width: '100%' }}
+                // prefix={<DollarOutlined />}
+              />
+            </Form.Item>
+
+            {editingSubject.isTemp && (
+              <Typography.Text type="warning">
+                This is a temporary subject. Changes will only apply to this session.
+              </Typography.Text>
+            )}
+          </Form>
+        )}
       </Modal>
 
       {/* New Teacher Modal */}
@@ -523,7 +738,7 @@ const AddClassSchedule = () => {
             type="primary"
             loading={creatingTeacher}
             onClick={handleAddNewTeacher}
-            style={{ background: '#3b1fa3', borderColor: '#3b1fa3' }}
+            style={{ background: '#52c41a', borderColor: '#52c41a' }}
           >
             Create Teacher
           </Button>
@@ -568,10 +783,6 @@ const AddClassSchedule = () => {
               size="large"
             />
           </Form.Item>
-          
-          <Typography.Text type="secondary">
-            The teacher will be created immediately and can be selected for this class.
-          </Typography.Text>
         </Form>
       </Modal>
     </div>

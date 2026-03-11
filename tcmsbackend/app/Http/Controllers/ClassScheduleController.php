@@ -30,6 +30,7 @@ class ClassScheduleController extends Controller
                     'class.subjectId',
                     'subject.name as subjectName',
                     'subject.form',
+                    'subject.subjectFee',
                     'authority.name as teacherName'
                 )
                 ->orderBy('class.classDay')
@@ -90,6 +91,7 @@ class ClassScheduleController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'form' => 'required|string|max:100',
+            'subjectFee' => 'required|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -116,6 +118,7 @@ class ClassScheduleController extends Controller
             $subjectId = DB::table('subject')->insertGetId([
                 'name' => $request->name,
                 'form' => $request->form,
+                'subjectFee' => $request->subjectFee,
             ]);
 
             Log::info('Subject created', ['subjectId' => $subjectId]);
@@ -123,7 +126,12 @@ class ClassScheduleController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Subject created successfully',
-                'data' => ['subjectId' => $subjectId, 'name' => $request->name, 'form' => $request->form]
+                'data' => [
+                    'subjectId' => $subjectId, 
+                    'name' => $request->name, 
+                    'form' => $request->form,
+                    'subjectFee' => $request->subjectFee
+                ]
             ], 201);
 
         } catch (\Exception $e) {
@@ -131,6 +139,77 @@ class ClassScheduleController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create subject'
+            ], 500);
+        }
+    }
+
+    /**
+     * PUT /api/subjects/{id}
+     * Update an existing subject
+     */
+    public function updateSubject(Request $request, $subjectId)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:100',
+            'form' => 'required|string|max:100',
+            'subjectFee' => 'required|numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Check if another subject with same name and form already exists (excluding current)
+            $existing = DB::table('subject')
+                ->where('name', $request->name)
+                ->where('form', $request->form)
+                ->where('subjectId', '!=', $subjectId)
+                ->first();
+
+            if ($existing) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Another subject with this name and form already exists'
+                ], 400);
+            }
+
+            $affected = DB::table('subject')
+                ->where('subjectId', $subjectId)
+                ->update([
+                    'name' => $request->name,
+                    'form' => $request->form,
+                    'subjectFee' => $request->subjectFee,
+                ]);
+
+            if ($affected === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Subject not found'
+                ], 404);
+            }
+
+            Log::info('Subject updated', ['subjectId' => $subjectId]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Subject updated successfully',
+                'data' => [
+                    'subjectId' => (int)$subjectId,
+                    'name' => $request->name,
+                    'form' => $request->form,
+                    'subjectFee' => $request->subjectFee
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('updateSubject failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update subject'
             ], 500);
         }
     }
@@ -338,6 +417,7 @@ class ClassScheduleController extends Controller
             'newSubject' => 'nullable|array',
             'newSubject.name' => 'required_with:newSubject|string|max:100',
             'newSubject.form' => 'required_with:newSubject|string|max:100',
+            'newSubject.subjectFee' => 'required_with:newSubject|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -365,6 +445,7 @@ class ClassScheduleController extends Controller
                     $subjectId = DB::table('subject')->insertGetId([
                         'name' => $request->newSubject['name'],
                         'form' => $request->newSubject['form'],
+                        'subjectFee' => $request->newSubject['subjectFee'],
                     ]);
                     Log::info('Subject created during class creation', ['subjectId' => $subjectId]);
                 }

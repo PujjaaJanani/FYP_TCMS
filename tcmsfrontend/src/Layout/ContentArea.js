@@ -20,7 +20,6 @@ import ViewApplications from '../Applications/ViewApplications';
 import ViewClassSchedule from '../ClassSchedule/ViewClassSchedule';
 import AddClassSchedule from '../ClassSchedule/AddClassSchedule';
 import EditClassSchedule from '../ClassSchedule/EditClassSchedule';
-// import Payment from '../Pages/Payment';
 import StaffClasses from '../StudyMaterial/StaffClasses';
 import StaffMaterials from '../StudyMaterial/StaffMaterials';
 import AddMaterial from '../StudyMaterial/AddMaterial';
@@ -30,14 +29,18 @@ import StudentClasses from '../StudyMaterial/StudentClasses';
 import StudentMaterials from '../StudyMaterial/StudentMaterials';
 import RecordAttendance from '../Attendance/RecordAttendance';
 import StaffAttendance from '../Attendance/StaffAttendance';
+import StaffPayment from '../Payment/StaffPayment';
 
 // Admin Pages (uncomment when ready)
 // import AdminDashboard from '../Pages/AdminDashboard';
-// import UserManagement from '../Pages/UserManagement';
+import UserManagement from '../UserAccount/UserManagement';
+import AddUser from '../UserAccount/AddUser';
+import EditUser from '../UserAccount/EditUser';
 
 // Student Pages (uncomment when ready)
 // import StudentDashboard from '../Pages/StudentDashboard';
 // import StudentProfile from '../Pages/StudentProfile';
+import StudentPayment from '../Payment/StudentPayment';
 
 const { Content } = Layout;
 
@@ -72,10 +75,11 @@ const ContentArea = () => {
             <Route path="/staff/applications" element={<ViewApplications />} />
             {/* <Route path="/staff/dashboard" element={<StaffDashboard />} /> */}
             {/* <Route path="/staff/profile" element={<StaffProfile />} /> */}
-            <Route path="/staff/schedule" element={<ViewClassSchedule />} />
-            <Route path="/staff/schedule/add" element={<AddClassSchedule />} />
-            <Route path="/staff/schedule/edit/:classId" element={<EditClassSchedule />} />
-            {/* <Route path="/staff/payment" element={<Payment />} /> */}
+            <Route path="/authority/schedule" element={<ViewClassSchedule />} />
+            <Route path="/authority/schedule/add" element={<AddClassSchedule />} />
+            <Route path="/authority/schedule/edit/:classId" element={<EditClassSchedule />} />
+            {/* <Route path="/staff/payment" element={<StaffPayment />} /> */}
+            <Route path="/staff/payments" element={<StaffPayment />} />
             <Route path="/staff/materials" element={<StaffClasses />} />
             <Route path="/staff/materials/class/:classId" element={<StaffMaterials />} />
             <Route path="/staff/materials/add" element={<AddMaterial />} />
@@ -86,16 +90,19 @@ const ContentArea = () => {
 
             {/* Admin Routes (uncomment when ready) */}
             {/* <Route path="/admin/dashboard" element={<AdminDashboard />} /> */}
-            {/* <Route path="/admin/users" element={<UserManagement />} /> */}
-            <Route path="/admin/schedule" element={<ViewClassSchedule />} />
-            <Route path="/admin/schedule/add" element={<AddClassSchedule />} />
-            <Route path="/admin/schedule/edit/:classId" element={<EditClassSchedule />} />
+            <Route path="/admin/users" element={<UserManagement />} />
+            <Route path="/admin/users" element={<UserManagement />} />
+            <Route path="/admin/users/add" element={<AddUser />} />
+            <Route path="/admin/users/edit/:userType/:userId" element={<EditUser />} />
+            <Route path="/authority/schedule" element={<ViewClassSchedule />} />
+            <Route path="/authority/schedule/add" element={<AddClassSchedule />} />
+            <Route path="/authority/schedule/edit/:classId" element={<EditClassSchedule />} />
 
             {/* Student Routes (uncomment when ready) */}
             {/* <Route path="/student/dashboard" element={<StudentDashboard />} /> */}
             {/* <Route path="/student/profile" element={<StudentProfile />} /> */}
             <Route path="/student/schedule" element={<ViewClassSchedule />} />
-            {/* <Route path="/student/payment" element={<Payment />} /> */}
+            <Route path="/student/payment" element={<StudentPayment />} />
             <Route path="/student/materials" element={<StudentClasses />} />
             <Route path="/student/materials/class/:classId" element={<StudentMaterials />} />
 

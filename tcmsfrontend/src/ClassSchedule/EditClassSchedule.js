@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Form, Input, Select, TimePicker, Button, Card, message, Typography, Flex, Spin, Row, Col,
-  Modal, Space
+  Modal, Space, InputNumber
 } from 'antd';
 import { 
   ArrowLeftOutlined, 
@@ -10,7 +10,9 @@ import {
   PlusOutlined,
   BookOutlined,
   UserOutlined,
-  TeamOutlined 
+  TeamOutlined,
+  DollarOutlined,
+  EditOutlined
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -27,10 +29,13 @@ const EditClassSchedule = () => {
   const [subjects, setSubjects] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [isSubjectModalVisible, setIsSubjectModalVisible] = useState(false);
+  const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] = useState(false);
   const [isTeacherModalVisible, setIsTeacherModalVisible] = useState(false);
-  const [newSubject, setNewSubject] = useState({ name: '', form: '' });
+  const [newSubject, setNewSubject] = useState({ name: '', form: '', subjectFee: 0 });
+  const [editingSubject, setEditingSubject] = useState(null);
   const [newTeacher, setNewTeacher] = useState({ name: '', email: '', phone: '', password: '' });
   const [creatingTeacher, setCreatingTeacher] = useState(false);
+  const [updatingSubject, setUpdatingSubject] = useState(false);
   const navigate = useNavigate();
   const { classId } = useParams();
 
@@ -70,7 +75,7 @@ const EditClassSchedule = () => {
           });
         } else {
           message.error('Class not found');
-          navigate('/staff/schedule');
+          navigate('/authority/schedule');
         }
       }
     } catch (error) {
@@ -83,7 +88,12 @@ const EditClassSchedule = () => {
 
   const handleAddNewSubject = () => {
     if (!newSubject.name || !newSubject.form) {
-      message.error('Please fill in both subject name and form');
+      message.error('Please fill in subject name and form');
+      return;
+    }
+
+    if (!newSubject.subjectFee || newSubject.subjectFee <= 0) {
+      message.error('Please enter a valid subject fee');
       return;
     }
 
@@ -97,7 +107,7 @@ const EditClassSchedule = () => {
       message.warning('This subject already exists');
       form.setFieldsValue({ subjectId: existingSubject.subjectId });
       setIsSubjectModalVisible(false);
-      setNewSubject({ name: '', form: '' });
+      setNewSubject({ name: '', form: '', subjectFee: 0 });
       return;
     }
 
@@ -115,13 +125,14 @@ const EditClassSchedule = () => {
         const newSubjectData = {
           subjectId: res.data.data.subjectId,
           name: newSubject.name,
-          form: newSubject.form
+          form: newSubject.form,
+          subjectFee: newSubject.subjectFee
         };
         setSubjects([...subjects, newSubjectData]);
         // Auto-select the new subject
         form.setFieldsValue({ subjectId: newSubjectData.subjectId });
         setIsSubjectModalVisible(false);
-        setNewSubject({ name: '', form: '' });
+        setNewSubject({ name: '', form: '', subjectFee: 0 });
       }
     })
     .catch(err => {
@@ -130,6 +141,51 @@ const EditClassSchedule = () => {
     .finally(() => {
       setCreatingTeacher(false);
     });
+  };
+
+  const handleEditSubject = (subject) => {
+    setEditingSubject(subject);
+    setIsEditSubjectModalVisible(true);
+  };
+
+  const handleUpdateSubject = async () => {
+    if (!editingSubject.name || !editingSubject.form) {
+      message.error('Please fill in subject name and form');
+      return;
+    }
+
+    if (!editingSubject.subjectFee || editingSubject.subjectFee <= 0) {
+      message.error('Please enter a valid subject fee');
+      return;
+    }
+
+    setUpdatingSubject(true);
+    try {
+      const res = await axios.put(
+        `http://localhost:8000/api/subjects/${editingSubject.subjectId}`,
+        {
+          name: editingSubject.name,
+          form: editingSubject.form,
+          subjectFee: editingSubject.subjectFee
+        },
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      );
+
+      if (res.data.success) {
+        message.success('Subject updated successfully');
+        // Update subjects list
+        setSubjects(subjects.map(s => 
+          s.subjectId === editingSubject.subjectId ? { ...s, ...editingSubject } : s
+        ));
+        setIsEditSubjectModalVisible(false);
+        setEditingSubject(null);
+      }
+    } catch (err) {
+      console.error('Failed to update subject:', err);
+      message.error(err.response?.data?.message || 'Failed to update subject');
+    } finally {
+      setUpdatingSubject(false);
+    }
   };
 
   const handleAddNewTeacher = async () => {
@@ -197,7 +253,7 @@ const EditClassSchedule = () => {
 
       if (res.data.success) {
         message.success('Class updated successfully!');
-        navigate('/staff/schedule');
+        navigate('/authority/schedule');
       }
     } catch (err) {
       console.error('Failed to update class:', err);
@@ -207,25 +263,57 @@ const EditClassSchedule = () => {
     }
   };
 
-  // Custom dropdown render for subjects
+  // Custom dropdown render for subjects with edit button
   const renderSubjectDropdown = (menu) => (
     <>
       {menu}
       <div style={{ 
         display: 'flex', 
-        alignItems: 'center', 
-        padding: '8px',
+        flexDirection: 'column',
         borderTop: '1px solid #e8e8e8',
         marginTop: 4
       }}>
-        <Button 
-          type="text" 
-          icon={<PlusOutlined />} 
-          onClick={() => setIsSubjectModalVisible(true)}
-          style={{ width: '100%', justifyContent: 'flex-start' }}
-        >
-          Add New Subject
-        </Button>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          padding: '8px',
+          borderBottom: '1px dashed #e8e8e8'
+        }}>
+          <Button 
+            type="text" 
+            icon={<PlusOutlined />} 
+            onClick={() => setIsSubjectModalVisible(true)}
+            style={{ width: '100%', justifyContent: 'flex-start' }}
+          >
+            Add New Subject
+          </Button>
+        </div>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          padding: '8px'
+        }}>
+          <Button 
+            type="text" 
+            icon={<EditOutlined />} 
+            onClick={() => {
+              const selectedId = form.getFieldValue('subjectId');
+              if (selectedId) {
+                const subject = subjects.find(s => s.subjectId === selectedId);
+                if (subject) {
+                  handleEditSubject(subject);
+                } else {
+                  message.warning('Please select a subject first');
+                }
+              } else {
+                message.warning('Please select a subject first');
+              }
+            }}
+            style={{ width: '100%', justifyContent: 'flex-start' }}
+          >
+            Edit Selected Subject
+          </Button>
+        </div>
       </div>
     </>
   );
@@ -281,7 +369,7 @@ const EditClassSchedule = () => {
       <div style={{ marginBottom: 16 }}>
         <Button
           icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/staff/schedule')}
+          onClick={() => navigate('/authority/schedule')}
         >
           Back to Schedule
         </Button>
@@ -319,7 +407,7 @@ const EditClassSchedule = () => {
                   >
                     <Select 
                       placeholder="Select subject or add new"
-                      popupRender={renderSubjectDropdown}
+                      dropdownRender={renderSubjectDropdown}
                       getPopupContainer={(trigger) => trigger.parentElement}
                       showSearch
                       optionFilterProp="children"
@@ -327,9 +415,14 @@ const EditClassSchedule = () => {
                     >
                       {subjects.map(s => (
                         <Option key={s.subjectId} value={s.subjectId}>
-                          <Space>
-                            <BookOutlined />
-                            {s.name} - {s.form}
+                          <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                            <Space>
+                              <BookOutlined />
+                              <span>{s.name} - {s.form}</span>
+                            </Space>
+                            {/* <div style={{ fontSize: '12px', color: '#52c41a' }}>
+                              Fee: RM {s.subjectFee?.toFixed(2) || '0.00'}
+                            </div> */}
                           </Space>
                         </Option>
                       ))}
@@ -387,7 +480,7 @@ const EditClassSchedule = () => {
                   >
                     <Select 
                       placeholder="Select teacher or add new"
-                      popupRender={renderTeacherDropdown}
+                      dropdownRender={renderTeacherDropdown}
                       getPopupContainer={(trigger) => trigger.parentElement}
                       showSearch
                       optionFilterProp="children"
@@ -423,7 +516,7 @@ const EditClassSchedule = () => {
                         Update Class
                       </Button>
                       <Button 
-                        onClick={() => navigate('/staff/schedule')}
+                        onClick={() => navigate('/authority/schedule')}
                         style={{ minWidth: 100 }}
                       >
                         Cancel
@@ -448,12 +541,12 @@ const EditClassSchedule = () => {
         open={isSubjectModalVisible}
         onCancel={() => {
           setIsSubjectModalVisible(false);
-          setNewSubject({ name: '', form: '' });
+          setNewSubject({ name: '', form: '', subjectFee: 0 });
         }}
         footer={[
           <Button key="cancel" onClick={() => {
             setIsSubjectModalVisible(false);
-            setNewSubject({ name: '', form: '' });
+            setNewSubject({ name: '', form: '', subjectFee: 0 });
           }}>
             Cancel
           </Button>,
@@ -462,7 +555,7 @@ const EditClassSchedule = () => {
             type="primary"
             loading={creatingTeacher}
             onClick={handleAddNewSubject}
-            style={{ background: '#3b1fa3', borderColor: '#3b1fa3' }}
+            style={{ background: '#52c41a', borderColor: '#52c41a' }}
           >
             Create Subject
           </Button>
@@ -477,6 +570,7 @@ const EditClassSchedule = () => {
               size="large"
             />
           </Form.Item>
+          
           <Form.Item label="Form/Level" required>
             <Select
               placeholder="Select form"
@@ -490,7 +584,94 @@ const EditClassSchedule = () => {
               ))}
             </Select>
           </Form.Item>
+
+          <Form.Item label="Subject Fee (RM)" required>
+            <InputNumber
+              placeholder="e.g., 150.00"
+              value={newSubject.subjectFee}
+              onChange={(value) => setNewSubject({ ...newSubject, subjectFee: value })}
+              size="large"
+              min={0}
+              step={10}
+              precision={2}
+              style={{ width: '100%' }}
+              // prefix={<DollarOutlined />}
+            />
+          </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Edit Subject Modal */}
+      <Modal
+        title={
+          <Space>
+            <EditOutlined style={{ color: '#3b1fa3' }} />
+            <span>Edit Subject</span>
+          </Space>
+        }
+        open={isEditSubjectModalVisible}
+        onCancel={() => {
+          setIsEditSubjectModalVisible(false);
+          setEditingSubject(null);
+        }}
+        footer={[
+          <Button key="cancel" onClick={() => {
+            setIsEditSubjectModalVisible(false);
+            setEditingSubject(null);
+          }}>
+            Cancel
+          </Button>,
+          <Button
+            key="update"
+            type="primary"
+            loading={updatingSubject}
+            onClick={handleUpdateSubject}
+            style={{ background: '#52c41a', borderColor: '#52c41a' }}
+          >
+            Update Subject
+          </Button>
+        ]}
+      >
+        {editingSubject && (
+          <Form layout="vertical">
+            <Form.Item label="Subject Name" required>
+              <Input
+                placeholder="e.g., Mathematics, Physics, Chemistry"
+                value={editingSubject.name}
+                onChange={(e) => setEditingSubject({ ...editingSubject, name: e.target.value })}
+                size="large"
+              />
+            </Form.Item>
+            
+            <Form.Item label="Form/Level" required>
+              <Select
+                placeholder="Select form"
+                value={editingSubject.form}
+                onChange={(value) => setEditingSubject({ ...editingSubject, form: value })}
+                size="large"
+                getPopupContainer={(trigger) => trigger.parentElement}
+              >
+                {['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5'].map(f => (
+                  <Option key={f} value={f}>{f}</Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item label="Subject Fee (RM)" required>
+              <InputNumber
+                placeholder="e.g., 150.00"
+                value={editingSubject.subjectFee}
+                onChange={(value) => setEditingSubject({ ...editingSubject, subjectFee: value })}
+                size="large"
+                min={0}
+                step={10}
+                precision={2}
+                style={{ width: '100%' }}
+                // prefix={<DollarOutlined />}
+              />
+            </Form.Item>
+          </Form>
+        )}
       </Modal>
 
       {/* New Teacher Modal */}
@@ -518,7 +699,7 @@ const EditClassSchedule = () => {
             type="primary"
             loading={creatingTeacher}
             onClick={handleAddNewTeacher}
-            style={{ background: '#3b1fa3', borderColor: '#3b1fa3' }}
+            style={{ background: '#52c41a', borderColor: '#52c41a' }}
           >
             Create Teacher
           </Button>

@@ -9,6 +9,8 @@ use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\StudyMaterialController;
 use App\Http\Controllers\TestMarkController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\UserManagementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -61,6 +63,8 @@ Route::get('/test', function() {
     Route::get('/classes/by-subject/{subjectId}', [RegistrationController::class, 'getClassesBySubject']); // Public
     Route::get('/classes', [RegistrationController::class, 'getAllClasses']); // Public
     Route::get('/registration-status/{email}', [RegistrationController::class, 'checkRegistrationStatus']); // Public
+    Route::get('/payments/toyyibpay/callback', [PaymentController::class, 'toyyibpayCallback']);
+    Route::post('/payments/toyyibpay/callback', [PaymentController::class, 'toyyibpayCallback']);
 
     // Protected routes - using Sanctum
     Route::middleware('auth:sanctum')->group(function () {
@@ -84,6 +88,7 @@ Route::get('/test', function() {
     Route::delete('/teachers/{id}', [ClassScheduleController::class, 'deleteTeacher']);
     Route::get('/subjects/manage', [ClassScheduleController::class, 'getAllSubjects']);
     Route::post('/subjects', [ClassScheduleController::class, 'createSubject']);
+    Route::put('/subjects/{id}', [ClassScheduleController::class, 'updateSubject']); 
 
     // Study Materials Management
     Route::get('/study-materials/my-classes', [StudyMaterialController::class, 'getMyClasses']);
@@ -116,6 +121,31 @@ Route::get('/test', function() {
         Route::get('/class/{classId}/history', [AttendanceController::class, 'getClassAttendanceHistory']);
         Route::get('/class/{classId}/date/{date}', [AttendanceController::class, 'getAttendanceByDate']);
         Route::delete('/class/{classId}/date/{date}', [AttendanceController::class, 'deleteAttendanceByDate']); 
+    });
+
+    Route::prefix('payments')->group(function () {
+        Route::get('/student', [PaymentController::class, 'getStudentPayments']);
+        Route::get('/monthly-fee', [PaymentController::class, 'getMonthlyFee']);
+        Route::post('/create-intent', [PaymentController::class, 'createPaymentIntent']);
+        // In routes/api.php payments section, add:
+        Route::get('/verify/{paymentId}', [PaymentController::class, 'verifyPaymentStatus']);
+    });
+
+    Route::prefix('staff/payments')->group(function () {
+        Route::get('/', [PaymentController::class, 'getAllPayments']);
+        Route::get('/stats', [PaymentController::class, 'getPaymentStats']);
+        Route::put('/{paymentId}', [PaymentController::class, 'updatePayment']);
+        Route::get('/students-month', [PaymentController::class, 'getAllStudentsPaymentStatus']);
+        Route::post('/student-payment', [PaymentController::class, 'upsertStudentPayment']);
+    });
+
+    Route::prefix('users')->group(function () {
+        Route::get('/', [UserManagementController::class, 'getAllUsers']);
+        Route::get('/{userType}/{id}', [UserManagementController::class, 'getUser']);
+        Route::post('/', [UserManagementController::class, 'createUser']);
+        Route::put('/{userType}/{id}', [UserManagementController::class, 'updateUser']);
+        Route::delete('/{userType}/{id}', [UserManagementController::class, 'deleteUser']);
+        Route::get('/student/{studentId}/registration', [UserManagementController::class, 'getStudentRegistration']);
     });
 
 });
