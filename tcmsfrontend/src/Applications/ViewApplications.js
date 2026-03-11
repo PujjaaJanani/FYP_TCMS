@@ -40,33 +40,80 @@ const ViewApplications = () => {
 
   useEffect(() => { fetchRegistrations(); }, []);
 
-  const handleAction = async (registrationId, action) => {
-    setActionLoading(registrationId + action);
-    try {
-      const res = await axios.patch(
-        `http://localhost:8000/api/registrations/${registrationId}/status`,
-        { status: action },
-        { headers: { Authorization: `Bearer ${getToken()}` } }
-      );
-      if (res.data.success) {
-        message.success(`Registration ${action.toLowerCase()} successfully`);
-        setRegistrations(prev =>
-          prev.map(r =>
-            r.registrationId === registrationId ? { ...r, status: action } : r
-          )
-        );
-        if (detailModal.record?.registrationId === registrationId) {
-          setDetailModal(prev => ({
-            ...prev,
-            record: { ...prev.record, status: action }
-          }));
+  const handleApprove = (registrationId) => {
+    Modal.confirm({
+      title: 'Approve Registration',
+      content: 'Are you sure you want to approve this registration?',
+      okText: 'Yes, Approve',
+      okType: 'primary',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        setActionLoading(registrationId + 'Approved');
+        try {
+          const res = await axios.patch(
+            `http://localhost:8000/api/registrations/${registrationId}/status`,
+            { status: 'Approved' },
+            { headers: { Authorization: `Bearer ${getToken()}` } }
+          );
+          if (res.data.success) {
+            message.success('Registration approved successfully');
+            setRegistrations(prev =>
+              prev.map(r =>
+                r.registrationId === registrationId ? { ...r, status: 'Approved' } : r
+              )
+            );
+            if (detailModal.record?.registrationId === registrationId) {
+              setDetailModal(prev => ({
+                ...prev,
+                record: { ...prev.record, status: 'Approved' }
+              }));
+            }
+          }
+        } catch {
+          message.error('Failed to approve registration');
+        } finally {
+          setActionLoading(null);
         }
       }
-    } catch {
-      message.error(`Failed to ${action.toLowerCase()} registration`);
-    } finally {
-      setActionLoading(null);
-    }
+    });
+  };
+
+  const handleReject = (registrationId) => {
+    Modal.confirm({
+      title: 'Reject Registration',
+      content: 'Are you sure you want to reject this registration?',
+      okText: 'Yes, Reject',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        setActionLoading(registrationId + 'Rejected');
+        try {
+          const res = await axios.patch(
+            `http://localhost:8000/api/registrations/${registrationId}/status`,
+            { status: 'Rejected' },
+            { headers: { Authorization: `Bearer ${getToken()}` } }
+          );
+          if (res.data.success) {
+            message.success('Registration rejected successfully');
+            setRegistrations(prev =>
+              prev.map(r =>
+                r.registrationId === registrationId ? { ...r, status: 'Rejected' } : r
+              )
+            );
+            if (detailModal.record?.registrationId === registrationId) {
+              setDetailModal(prev => ({
+                ...prev,
+                record: { ...prev.record, status: 'Rejected' }
+              }));
+            }
+          }
+        } catch {
+          message.error('Failed to reject registration');
+        } finally {
+          setActionLoading(null);
+        }
+      }
+    });
   };
 
   const statusTag = (status) => {
@@ -146,10 +193,23 @@ const ViewApplications = () => {
           </Button>
           {r.status === 'Pending' && (
             <>
-              <Button size="small" type="primary" icon={<CheckCircleOutlined />} loading={actionLoading === r.registrationId + 'Approved'} onClick={() => handleAction(r.registrationId, 'Approved')} style={{ background: '#389e0d', borderColor: '#389e0d' }}>
+              <Button 
+                size="small" 
+                type="primary" 
+                icon={<CheckCircleOutlined />} 
+                loading={actionLoading === r.registrationId + 'Approved'} 
+                onClick={() => handleApprove(r.registrationId)} 
+                style={{ background: '#389e0d', borderColor: '#389e0d' }}
+              >
                 Approve
               </Button>
-              <Button size="small" danger icon={<CloseCircleOutlined />} loading={actionLoading === r.registrationId + 'Rejected'} onClick={() => handleAction(r.registrationId, 'Rejected')}>
+              <Button 
+                size="small" 
+                danger 
+                icon={<CloseCircleOutlined />} 
+                loading={actionLoading === r.registrationId + 'Rejected'} 
+                onClick={() => handleReject(r.registrationId)}
+              >
                 Reject
               </Button>
             </>
@@ -183,7 +243,42 @@ const ViewApplications = () => {
 
       <Table dataSource={displayed} columns={columns} rowKey="registrationId" loading={loading} pagination={{ pageSize: 10 }} scroll={{ x: 800 }} />
 
-      <Modal title={<span style={{ color: '#3b1fa3', fontWeight: 700, fontSize: 18 }}>Registration #{detailModal.record?.registrationId}</span>} open={detailModal.open} onCancel={() => setDetailModal({ open: false, record: null })} footer={detailModal.record?.status === 'Pending' ? (<Flex gap={8}><Button type="primary" icon={<CheckCircleOutlined />} loading={actionLoading === detailModal.record?.registrationId + 'Approved'} onClick={() => handleAction(detailModal.record.registrationId, 'Approved')} style={{ background: '#389e0d', borderColor: '#389e0d' }}>Approve</Button><Button danger icon={<CloseCircleOutlined />} loading={actionLoading === detailModal.record?.registrationId + 'Rejected'} onClick={() => handleAction(detailModal.record.registrationId, 'Rejected')}>Reject</Button><Button onClick={() => setDetailModal({ open: false, record: null })}>Close</Button></Flex>) : (<Button onClick={() => setDetailModal({ open: false, record: null })}>Close</Button>)} width={640}>
+      <Modal 
+        title={<span style={{ color: '#3b1fa3', fontWeight: 700, fontSize: 18 }}>Registration #{detailModal.record?.registrationId}</span>} 
+        open={detailModal.open} 
+        onCancel={() => setDetailModal({ open: false, record: null })} 
+        footer={detailModal.record?.status === 'Pending' ? (
+          <Flex gap={8}>
+            <Button 
+              type="primary" 
+              icon={<CheckCircleOutlined />} 
+              loading={actionLoading === detailModal.record?.registrationId + 'Approved'} 
+              onClick={() => {
+                setDetailModal({ open: false, record: null });
+                handleApprove(detailModal.record.registrationId);
+              }} 
+              style={{ background: '#389e0d', borderColor: '#389e0d' }}
+            >
+              Approve
+            </Button>
+            <Button 
+              danger 
+              icon={<CloseCircleOutlined />} 
+              loading={actionLoading === detailModal.record?.registrationId + 'Rejected'} 
+              onClick={() => {
+                setDetailModal({ open: false, record: null });
+                handleReject(detailModal.record.registrationId);
+              }}
+            >
+              Reject
+            </Button>
+            <Button onClick={() => setDetailModal({ open: false, record: null })}>Close</Button>
+          </Flex>
+        ) : (
+          <Button onClick={() => setDetailModal({ open: false, record: null })}>Close</Button>
+        )} 
+        width={640}
+      >
         {detailModal.record && (
           <>
             <div style={styles.sectionTitle}><UserOutlined /> Student Details</div>
