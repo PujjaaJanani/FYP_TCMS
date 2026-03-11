@@ -67,6 +67,9 @@ class RegistrationController extends Controller
             // Store multiple class IDs
             $classIds = implode(',', $request->classes);
             $firstClassId = $request->classes[0]; // Keep first class as FK
+
+            // Calculate total monthly fee based on subject fees
+            $totalMonthlyFee = $this->calculateTotalMonthlyFee($request->classes);
             
             $registrationId = DB::table('registration')->insertGetId([
                 'createdAt' => now(),
@@ -74,13 +77,15 @@ class RegistrationController extends Controller
                 'studentId' => (int)$studentId,
                 'classId' => (int)$firstClassId,  // Foreign key - first class
                 'classIds' => $classIds,          // All classes as "1,2,3"
+                'monthlyFee' => $totalMonthlyFee, // Calculated total fee
             ]);
 
             Log::info('Registration created', [
                 'studentId' => $studentId,
                 'registrationId' => $registrationId,
                 'classIds' => $classIds,
-                'classCount' => count($request->classes)
+                'classCount' => count($request->classes),
+                'monthlyFee' => $totalMonthlyFee
             ]);
 
             DB::commit();
@@ -93,6 +98,7 @@ class RegistrationController extends Controller
                     'registrationId' => $registrationId,
                     'classIds' => $request->classes,
                     'classCount' => count($request->classes),
+                    'monthlyFee' => $totalMonthlyFee,
                     'status' => 'Pending'
                 ]
             ], 201);
@@ -113,13 +119,47 @@ class RegistrationController extends Controller
     }
 
     /**
+     * Calculate total monthly fee based on subject fees of selected classes
+     */
+    private function calculateTotalMonthlyFee($classIds)
+    {
+        try {
+            // Get all classes with their subject fees
+            $classes = DB::table('class')
+                ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
+                ->whereIn('class.classId', $classIds)
+                ->select('subject.subjectFee')
+                ->get();
+
+            $totalFee = 0;
+            foreach ($classes as $class) {
+                $totalFee += floatval($class->subjectFee);
+            }
+
+            Log::info('Monthly fee calculated', [
+                'classIds' => $classIds,
+                'totalFee' => $totalFee
+            ]);
+
+            return $totalFee;
+
+        } catch (\Exception $e) {
+            Log::error('Failed to calculate monthly fee', [
+                'error' => $e->getMessage(),
+                'classIds' => $classIds
+            ]);
+            return 0; // Return 0 if calculation fails
+        }
+    }
+
+    /**
      * Get all subjects
      */
     public function getSubjects()
     {
         try {
             $subjects = DB::table('subject')
-                ->select('subjectId', 'name', 'form')
+                ->select('subjectId', 'name', 'form', 'subjectFee')
                 ->get();
 
             return response()->json([
@@ -190,6 +230,7 @@ class RegistrationController extends Controller
                     'class.location',
                     'subject.name as subjectName',
                     'subject.form',
+                    'subject.subjectFee',
                     'authority.name as teacher'
                 )
                 ->get();
@@ -236,7 +277,8 @@ class RegistrationController extends Controller
                     'registration.registrationId',
                     'registration.status',
                     'registration.createdAt',
-                    'registration.classIds'
+                    'registration.classIds',
+                    'registration.monthlyFee'
                 )
                 ->get();
 
@@ -258,6 +300,7 @@ class RegistrationController extends Controller
                         'class.location',
                         'subject.name as subjectName',
                         'subject.form',
+                        'subject.subjectFee',
                         'authority.name as teacher'
                     )
                     ->get();
@@ -266,6 +309,7 @@ class RegistrationController extends Controller
                     'registrationId' => $registration->registrationId,
                     'status' => $registration->status,
                     'createdAt' => $registration->createdAt,
+                    'monthlyFee' => $registration->monthlyFee,
                     'classCount' => count($classIdArray),
                     'classes' => $classes
                 ];
