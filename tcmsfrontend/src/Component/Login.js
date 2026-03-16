@@ -31,10 +31,10 @@ const Login = () => {
           if (user.role === 'Admin') {
             navigate('/admin/dashboard');
           } else {
-            navigate('/staff/applications');
+            navigate('/staff/dashboard');
           }
         } else {
-          navigate('/student/schedule');
+          navigate('/student/dashboard');
         }
       }
     } catch (error) {

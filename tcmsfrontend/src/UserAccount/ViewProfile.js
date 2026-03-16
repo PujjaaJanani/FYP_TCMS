@@ -1,6 +1,6 @@
 // src/Pages/Profile.js
 import React, { useState, useEffect } from 'react';
-import { Card, Input, Button, Upload, Avatar, message, Modal, Form, Tag, Descriptions, Badge } from 'antd';
+import { Card, Input, Button, Upload, Avatar, message, Modal, Form, Tag, Spin } from 'antd';
 import { 
   UserOutlined, 
   CameraOutlined, 
@@ -419,16 +419,20 @@ const ViewProfile = () => {
       fontWeight: 500,
       backgroundColor: '#52c41a',
       borderColor: '#52c41a'
+    },
+    loadingContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+      background: '#f7f5ff'
     }
   };
 
   if (loading) {
     return (
-      <div style={styles.page}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>PROFILE</h1>
-        </div>
-        <div style={{ textAlign: 'center', paddingTop: 100 }}>Loading...</div>
+      <div style={styles.loadingContainer}>
+        <Spin size="large" />
       </div>
     );
   }

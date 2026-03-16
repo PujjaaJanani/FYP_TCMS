@@ -12,6 +12,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\DashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -154,6 +155,9 @@ Route::get('/test', function() {
     Route::put('/profile', [ProfileController::class, 'updateProfile']);
     Route::post('/profile/upload-picture', [ProfileController::class, 'uploadProfilePicture']);
     Route::delete('/profile/delete-picture', [ProfileController::class, 'deleteProfilePicture']);
+
+    // Dashboard Statistics
+    Route::get('/dashboard/stats', [DashboardController::class, 'getDashboardStats']);
 
 });
 

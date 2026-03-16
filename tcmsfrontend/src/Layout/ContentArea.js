@@ -14,8 +14,7 @@ import Register from '../Component/Register';
 
 // Staff Pages
 import ViewApplications from '../Applications/ViewApplications';
-// Uncomment when you create these pages
-// import StaffDashboard from '../Pages/StaffDashboard';
+import ViewDashboard from '../Dashboard/ViewDashboard';
 import ViewProfile from '../UserAccount/ViewProfile';
 import ViewClassSchedule from '../ClassSchedule/ViewClassSchedule';
 import AddClassSchedule from '../ClassSchedule/AddClassSchedule';
@@ -32,13 +31,11 @@ import StaffAttendance from '../Attendance/StaffAttendance';
 import StaffPayment from '../Payment/StaffPayment';
 
 // Admin Pages (uncomment when ready)
-// import AdminDashboard from '../Pages/AdminDashboard';
 import UserManagement from '../UserAccount/UserManagement';
 import AddUser from '../UserAccount/AddUser';
 import EditUser from '../UserAccount/EditUser';
 
 // Student Pages (uncomment when ready)
-// import StudentDashboard from '../Pages/StudentDashboard';
 import StudentPayment from '../Payment/StudentPayment';
 
 const { Content } = Layout;
@@ -72,12 +69,11 @@ const ContentArea = () => {
 
             {/* Staff Routes */}
             <Route path="/staff/applications" element={<ViewApplications />} />
-            {/* <Route path="/staff/dashboard" element={<StaffDashboard />} /> */}
+            <Route path="/staff/dashboard" element={<ViewDashboard />} />
             <Route path="/profile" element={<ViewProfile />} />
             <Route path="/authority/schedule" element={<ViewClassSchedule />} />
             <Route path="/authority/schedule/add" element={<AddClassSchedule />} />
             <Route path="/authority/schedule/edit/:classId" element={<EditClassSchedule />} />
-            {/* <Route path="/staff/payment" element={<StaffPayment />} /> */}
             <Route path="/staff/payments" element={<StaffPayment />} />
             <Route path="/staff/materials" element={<StaffClasses />} />
             <Route path="/staff/materials/class/:classId" element={<StaffMaterials />} />
@@ -88,7 +84,7 @@ const ContentArea = () => {
             <Route path="/staff/attendance/class/:classId" element={<RecordAttendance />} />
 
             {/* Admin Routes (uncomment when ready) */}
-            {/* <Route path="/admin/dashboard" element={<AdminDashboard />} /> */}
+            <Route path="/admin/dashboard" element={<ViewDashboard />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/users/add" element={<AddUser />} />
@@ -98,7 +94,7 @@ const ContentArea = () => {
             <Route path="/authority/schedule/edit/:classId" element={<EditClassSchedule />} />
 
             {/* Student Routes (uncomment when ready) */}
-            {/* <Route path="/student/dashboard" element={<StudentDashboard />} /> */}
+            <Route path="/student/dashboard" element={<ViewDashboard />} />
             <Route path="/student/schedule" element={<ViewClassSchedule />} />
             <Route path="/student/payment" element={<StudentPayment />} />
             <Route path="/student/materials" element={<StudentClasses />} />
