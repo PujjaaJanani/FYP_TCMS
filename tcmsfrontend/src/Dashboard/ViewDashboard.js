@@ -207,7 +207,17 @@ const ViewDashboard = () => {
     statCard: {
       borderRadius: 12,
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-      border: 'none'
+      border: 'none',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      '& .ant-statistic': {
+        flex: 1
+      }
+    },
+    progressContainer: {
+      marginTop: 8,
+      width: '100%'
     },
     chartCard: {
       borderRadius: 12,
@@ -602,74 +612,103 @@ const ViewDashboard = () => {
         </h1>
       </div>
 
-      {/* Statistics Cards */}
+            {/* Statistics Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} md={12} lg={6}>
+        <Col xs={24} sm={12} md={8} lg={8}>
           <Card style={styles.statCard}>
             <Statistic
               title={isStaff ? "My Students" : "Total Students"}
               value={stats.overview?.totalStudents || 0}
               prefix={<UserOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: '#1890ff', fontWeight: 600 }}
             />
           </Card>
         </Col>
         {isAdmin && (
-          <Col xs={24} sm={12} md={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6}>
             <Card style={styles.statCard}>
               <Statistic
                 title="Total Staff"
                 value={stats.overview?.totalStaff || 0}
                 prefix={<TeamOutlined style={{ color: '#52c41a' }} />}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: '#52c41a', fontWeight: 600 }}
               />
             </Card>
           </Col>
         )}
-        <Col xs={24} sm={12} md={12} lg={6}>
+        <Col xs={24} sm={12} md={8} lg={8}>
           <Card style={styles.statCard}>
             <Statistic
               title={isStaff ? "My Classes" : "Total Classes"}
               value={stats.overview?.totalClasses || 0}
               prefix={<BookOutlined style={{ color: '#faad14' }} />}
-              valueStyle={{ color: '#faad14' }}
+              valueStyle={{ color: '#faad14', fontWeight: 600 }}
             />
           </Card>
         </Col>
         {isAdmin && (
-          <Col xs={24} sm={12} md={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6}>
             <Card style={styles.statCard}>
               <Statistic
                 title="Pending Applications"
                 value={stats.overview?.pendingApplications || 0}
                 prefix={<FileTextOutlined style={{ color: '#f5222d' }} />}
-                valueStyle={{ color: '#f5222d' }}
+                valueStyle={{ color: '#f5222d', fontWeight: 600 }}
               />
             </Card>
           </Col>
         )}
-        <Col xs={24} sm={12} md={12} lg={6}>
-          <Card style={styles.statCard}>
-            <Statistic
-              title="Total Revenue"
-              value={stats.overview?.totalRevenue || 0}
-              prefix={<DollarOutlined style={{ color: '#722ed1' }} />}
-              valueStyle={{ color: '#722ed1' }}
-              precision={2}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={12} lg={6}>
-          <Card style={styles.statCard}>
-            <Statistic
-              title="Monthly Revenue"
-              value={stats.overview?.monthlyRevenue || 0}
-              prefix={<CalendarOutlined style={{ color: '#eb2f96' }} />}
-              valueStyle={{ color: '#eb2f96' }}
-              precision={2}
-            />
-          </Card>
-        </Col>
+        
+        {/* For Staff: Show Overall Attendance Rate - Responsive */}
+        {isStaff && (
+          <Col xs={24} sm={12} md={8} lg={8}>
+            <Card style={styles.statCard}>
+              <Statistic
+                title="Overall Attendance"
+                value={stats.overallAttendanceRate || 0}
+                precision={1}
+                suffix="%"
+                prefix={<CalendarOutlined style={{ color: '#722ed1' }} />}
+                valueStyle={{ color: '#722ed1', fontWeight: 600 }}
+              />
+              <Progress 
+                percent={stats.overallAttendanceRate || 0} 
+                size="small" 
+                strokeColor="#722ed1"
+                showInfo={false}
+                style={{ marginTop: 8 }}
+              />
+            </Card>
+          </Col>
+        )}
+
+        {/* For Admin: Show Revenue Cards */}
+        {isAdmin && (
+          <>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Card style={styles.statCard}>
+                <Statistic
+                  title="Total Revenue"
+                  value={stats.overview?.totalRevenue || 0}
+                  prefix={<DollarOutlined style={{ color: '#722ed1' }} />}
+                  valueStyle={{ color: '#722ed1', fontWeight: 600 }}
+                  precision={2}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Card style={styles.statCard}>
+                <Statistic
+                  title="Monthly Revenue"
+                  value={stats.overview?.monthlyRevenue || 0}
+                  prefix={<CalendarOutlined style={{ color: '#eb2f96' }} />}
+                  valueStyle={{ color: '#eb2f96', fontWeight: 600 }}
+                  precision={2}
+                />
+              </Card>
+            </Col>
+          </>
+        )}
       </Row>
 
       {/* Class Filter Dropdown */}

@@ -540,14 +540,35 @@ class DashboardController extends Controller
                 }
             }
 
-            // 6. Revenue Statistics
-            $totalRevenue = Payment::where('paymentStatus', 'Paid')->sum('amount');
-            $monthlyRevenue = Payment::where('paymentStatus', 'Paid')
-                ->whereYear('datePaid', $currentYear)
-                ->whereMonth('datePaid', $currentMonth)
-                ->sum('amount');
+            // 6. Revenue Statistics - Only for Admin
+            $totalRevenue = 0;
+            $monthlyRevenue = 0;
+            
+            if ($isAdmin) {
+                $totalRevenue = Payment::where('paymentStatus', 'Paid')->sum('amount');
+                $monthlyRevenue = Payment::where('paymentStatus', 'Paid')
+                    ->whereYear('datePaid', $currentYear)
+                    ->whereMonth('datePaid', $currentMonth)
+                    ->sum('amount');
+            }
 
-            // 7. Recent Registrations
+            // 7. Overall Attendance Rate (for Staff)
+            $overallAttendanceRate = 0;
+            if ($isStaff && !empty($staffClassIds)) {
+                $attendanceStats = DB::table('attendance')
+                    ->whereIn('attendance.classId', $staffClassIds)
+                    ->select(
+                        DB::raw('COUNT(CASE WHEN attendance.status = "Present" THEN 1 END) as presentCount'),
+                        DB::raw('COUNT(*) as totalCount')
+                    )
+                    ->first();
+                
+                if ($attendanceStats && $attendanceStats->totalCount > 0) {
+                    $overallAttendanceRate = round(($attendanceStats->presentCount / $attendanceStats->totalCount) * 100, 1);
+                }
+            }
+
+            // 8. Recent Registrations
             $recentRegistrationsQuery = Registration::with(['student:studentId,name,email'])
                 ->orderBy('createdAt', 'desc')
                 ->limit(5);
@@ -572,7 +593,7 @@ class DashboardController extends Controller
                     ];
                 });
 
-            // 8. Students by Subject (Admin only)
+            // 9. Students by Subject (Admin only)
             $studentsBySubject = [];
             if ($isAdmin) {
                 $studentsBySubject = DB::table('registration')
@@ -600,7 +621,7 @@ class DashboardController extends Controller
                     });
             }
 
-            // 9. Class list for staff (for dropdowns)
+            // 10. Class list for staff (for dropdowns)
             $staffClassList = [];
             if ($isStaff) {
                 $staffClassList = DB::table('class')
@@ -632,6 +653,7 @@ class DashboardController extends Controller
                 'data' => [
                     'userRole' => $isAdmin ? 'admin' : 'staff',
                     'staffId' => $staffId,
+                    'overallAttendanceRate' => $overallAttendanceRate,
                     'classes' => $allClasses->map(function($item) {
                         return [
                             'classId' => $item->classId,
