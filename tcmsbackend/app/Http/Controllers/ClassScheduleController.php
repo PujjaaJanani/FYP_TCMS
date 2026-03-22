@@ -10,9 +10,132 @@ use Illuminate\Support\Facades\Hash;
 
 class ClassScheduleController extends Controller
 {
+
+        /**
+     * GET /api/classes/schedule/public
+     * Get all classes for public viewing (no authentication required)
+     * Shows seat availability for public
+     */
+    public function getPublicClasses()
+    {
+        try {
+            $classes = DB::table('class')
+                ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
+                ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
+                ->select(
+                    'class.classId',
+                    'class.classDay',
+                    'class.startTime',
+                    'class.finishTime',
+                    'class.location',
+                    'class.availability',
+                    'subject.name as subjectName',
+                    'subject.form',
+                    'authority.name as teacherName'
+                )
+                ->orderBy('class.classDay')
+                ->orderBy('class.startTime')
+                ->get()
+                ->map(function ($c) {
+                    $c->startTime = date('H:i', strtotime($c->startTime));
+                    $c->finishTime = date('H:i', strtotime($c->finishTime));
+                    
+                    // Calculate current enrolled students for public view too
+                    $enrolledStudents = DB::table('registration')
+                        ->select('studentId')
+                        ->where('status', 'Approved')
+                        ->where(function($query) use ($c) {
+                            $query->where('classId', $c->classId)
+                                  ->orWhereRaw('FIND_IN_SET(?, classIds)', [$c->classId]);
+                        })
+                        ->distinct()
+                        ->pluck('studentId');
+                    
+                    $enrolledCount = $enrolledStudents->count();
+                    $c->enrolledStudents = $enrolledCount;
+                    $c->availableSpaces = max(0, $c->availability - $enrolledCount);
+                    
+                    return $c;
+                });
+ 
+            return response()->json([
+                'success' => true,
+                'data' => $classes
+            ], 200);
+ 
+        } catch (\Exception $e) {
+            Log::error('getPublicClasses failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load class schedule'
+            ], 500);
+        }
+    }
+
+        /**
+     * GET /api/classes/by-subject/{subjectId}
+     * Get classes for a specific subject (public endpoint for registration)
+     */
+    public function getClassesBySubject($subjectId)
+    {
+        try {
+            $classes = DB::table('class')
+                ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
+                ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
+                ->where('class.subjectId', $subjectId)
+                ->select(
+                    'class.classId',
+                    'class.classDay',
+                    'class.startTime',
+                    'class.finishTime',
+                    'class.location',
+                    'class.availability',
+                    'subject.name as subjectName',
+                    'subject.form',
+                    'authority.name as teacher'
+                )
+                ->orderBy('class.classDay')
+                ->orderBy('class.startTime')
+                ->get()
+                ->map(function ($c) {
+                    $c->startTime = date('H:i', strtotime($c->startTime));
+                    $c->finishTime = date('H:i', strtotime($c->finishTime));
+                    
+                    // Calculate available seats
+                    $enrolledStudents = DB::table('registration')
+                        ->select('studentId')
+                        ->where('status', 'Approved')
+                        ->where(function($query) use ($c) {
+                            $query->where('classId', $c->classId)
+                                  ->orWhereRaw('FIND_IN_SET(?, classIds)', [$c->classId]);
+                        })
+                        ->distinct()
+                        ->pluck('studentId');
+                    
+                    $enrolledCount = $enrolledStudents->count();
+                    $c->enrolledStudents = $enrolledCount;
+                    $c->availableSpaces = max(0, $c->availability - $enrolledCount);
+                    
+                    return $c;
+                });
+ 
+            return response()->json([
+                'success' => true,
+                'data' => $classes
+            ], 200);
+ 
+        } catch (\Exception $e) {
+            Log::error('getClassesBySubject failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load classes for this subject'
+            ], 500);
+        }
+    }
+
     /**
      * GET /api/classes/schedule
-     * Get all classes with subject and teacher details
+     * Get all classes with subject and teacher details + availability
      */
     public function getAllClasses()
     {
@@ -26,6 +149,7 @@ class ClassScheduleController extends Controller
                     'class.startTime',
                     'class.finishTime',
                     'class.location',
+                    'class.availability',
                     'class.authorityId',
                     'class.subjectId',
                     'subject.name as subjectName',
@@ -39,19 +163,48 @@ class ClassScheduleController extends Controller
                 ->map(function ($c) {
                     $c->startTime = date('H:i', strtotime($c->startTime));
                     $c->finishTime = date('H:i', strtotime($c->finishTime));
+                    
+                    // Calculate current enrolled students (APPROVED ONLY)
+                    // Method 1: Using subquery approach for better debugging
+                    $enrolledStudents = DB::table('registration')
+                        ->select('studentId')
+                        ->where('status', 'Approved')
+                        ->where(function($query) use ($c) {
+                            $query->where('classId', $c->classId)
+                                  ->orWhereRaw('FIND_IN_SET(?, classIds)', [$c->classId]);
+                        })
+                        ->distinct()
+                        ->pluck('studentId');
+                    
+                    $enrolledCount = $enrolledStudents->count();
+                    
+                    // Debug logging for class 1
+                    if ($c->classId == 1) {
+                        Log::info('Class 1 Enrollment Debug', [
+                            'classId' => $c->classId,
+                            'enrolledStudentIds' => $enrolledStudents->toArray(),
+                            'enrolledCount' => $enrolledCount,
+                            'availability' => $c->availability,
+                            'availableSpaces' => max(0, $c->availability - $enrolledCount)
+                        ]);
+                    }
+                    
+                    $c->enrolledStudents = $enrolledCount;
+                    $c->availableSpaces = max(0, $c->availability - $enrolledCount);
+                    
                     return $c;
                 });
-
+ 
             return response()->json([
                 'success' => true,
                 'data' => $classes
             ], 200);
-
+ 
         } catch (\Exception $e) {
             Log::error('getAllClasses failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch classes'
+                'message' => 'Failed to load classes'
             ], 500);
         }
     }
@@ -412,6 +565,7 @@ class ClassScheduleController extends Controller
             'startTime' => 'required',
             'finishTime' => 'required',
             'location' => 'nullable|string|max:100',
+            'availability' => 'required|integer|min:1|max:100',
             'authorityId' => 'required|integer|exists:authority,authorityId',
             'subjectId' => 'nullable|integer|exists:subject,subjectId',
             'newSubject' => 'nullable|array',
@@ -465,6 +619,7 @@ class ClassScheduleController extends Controller
                 'startTime' => $request->startTime,
                 'finishTime' => $request->finishTime,
                 'location' => $request->location,
+                'availability' => $request->availability,
                 'authorityId' => $request->authorityId,
                 'subjectId' => $subjectId,
             ]);
@@ -500,6 +655,7 @@ class ClassScheduleController extends Controller
             'startTime' => 'required',
             'finishTime' => 'required',
             'location' => 'nullable|string|max:100',
+            'availability' => 'required|integer|min:1|max:100',
             'authorityId' => 'required|integer|exists:authority,authorityId',
             'subjectId' => 'required|integer|exists:subject,subjectId',
         ]);
@@ -519,6 +675,7 @@ class ClassScheduleController extends Controller
                     'startTime' => $request->startTime,
                     'finishTime' => $request->finishTime,
                     'location' => $request->location,
+                    'availability' => $request->availability,
                     'authorityId' => $request->authorityId,
                     'subjectId' => $request->subjectId,
                 ]);

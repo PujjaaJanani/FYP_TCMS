@@ -39,6 +39,8 @@ class ClassModel extends Model
         'classDay',
         'startTime',
         'finishTime',
+        'location',
+        'availability',
         'authorityId',
         'subjectId',
     ];

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import './LandingPage.css';
 
 const LandingPage = () => {
@@ -11,10 +11,10 @@ const LandingPage = () => {
       <nav className="navbar">
         <div className="navbar-brand">Hari's Tuition Center</div>
         <div className="navbar-menu">
-          <a href="/">HOME</a>
-          <a href="/schedule">CLASS SCHEDULE</a>
-          <a href="/about">ABOUT US</a>
-          <a href="/contact">CONTACT</a>
+          <Link to="/">HOME</Link>
+          <Link to="/student/schedule">CLASS SCHEDULE</Link>
+          <Link to="/about">ABOUT US</Link>
+          <Link to="/contact">CONTACT</Link>
           <Button 
             type="primary" 
             className="login-nav-btn"

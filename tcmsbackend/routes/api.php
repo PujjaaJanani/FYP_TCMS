@@ -67,6 +67,9 @@ Route::get('/test', function() {
     Route::get('/registration-status/{email}', [RegistrationController::class, 'checkRegistrationStatus']); // Public
     Route::get('/payments/toyyibpay/callback', [PaymentController::class, 'toyyibpayCallback']);
     Route::post('/payments/toyyibpay/callback', [PaymentController::class, 'toyyibpayCallback']);
+    
+    // Public class schedule (no authentication required)
+    Route::get('/classes/schedule/public', [ClassScheduleController::class, 'getPublicClasses']);
 
     // Protected routes - using Sanctum
     Route::middleware('auth:sanctum')->group(function () {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, message } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { saveAuth } from '../Utils/LocalStorage';   // ← centralised localStorage helper
 import './Login.css';
@@ -53,10 +53,10 @@ const Login = () => {
       <nav className="navbar">
         <div className="navbar-brand">Hari's Tuition Center</div>
         <div className="navbar-menu">
-          <a href="/">HOME</a>
-          <a href="/schedule">CLASS SCHEDULE</a>
-          <a href="/about">ABOUT US</a>
-          <a href="/contact">CONTACT</a>
+          <Link to="/">HOME</Link>
+          <Link to="/student/schedule">CLASS SCHEDULE</Link>
+          <Link to="/about">ABOUT US</Link>
+          <Link to="/contact">CONTACT</Link>
         </div>
       </nav>
 

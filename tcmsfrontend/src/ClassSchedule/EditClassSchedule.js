@@ -71,6 +71,7 @@ const EditClassSchedule = () => {
               dayjs(classData.finishTime, 'HH:mm')
             ],
             location: classData.location,
+            availability: classData.availability || 30,
             authorityId: classData.authorityId
           });
         } else {
@@ -245,6 +246,7 @@ const EditClassSchedule = () => {
           startTime: values.timeRange[0].format('HH:mm:ss'),
           finishTime: values.timeRange[1].format('HH:mm:ss'),
           location: values.location,
+          availability: values.availability,
           authorityId: values.authorityId,
           subjectId: values.subjectId
         },
@@ -468,6 +470,24 @@ const EditClassSchedule = () => {
                   >
                     <Input 
                       placeholder="e.g., Room 101, Main Building" 
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label="Maximum Students"
+                    name="availability"
+                    rules={[
+                      { required: true, message: 'Please enter maximum students' },
+                      { type: 'number', min: 1, max: 100, message: 'Must be between 1 and 100' }
+                    ]}
+                  >
+                    <InputNumber 
+                      placeholder="e.g., 30"
+                      style={{ width: '100%' }}
+                      min={1}
+                      max={100}
                     />
                   </Form.Item>
                 </Col>

@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined,
-  ReloadOutlined, ClockCircleOutlined, EnvironmentOutlined
+  ReloadOutlined, ClockCircleOutlined, EnvironmentOutlined, ArrowLeftOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -25,18 +25,31 @@ const ViewClassSchedule = () => {
 
   const userType = getUserType();
   const role = getRole();
+  const token = getToken();
+  const isLoggedIn = !!token;
   const isAdminOrStaff = userType === 'authority' && (role === 'Admin' || role === 'Staff');
 
   const fetchClasses = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:8000/api/classes/schedule', {
-        headers: { Authorization: `Bearer ${getToken()}` }
-      });
+      let res;
+      
+      // Use the same endpoint for both public and authenticated users since both now show enrollment
+      if (isLoggedIn) {
+        res = await axios.get('http://localhost:8000/api/classes/schedule', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        res = await axios.get('http://localhost:8000/api/classes/schedule/public');
+      }
+      
       if (res.data.success) {
         setClasses(res.data.data);
+      } else {
+        message.error(res.data.message || 'Failed to load classes');
       }
-    } catch {
+    } catch (error) {
+      console.error('Failed to load classes:', error);
       message.error('Failed to load classes');
     } finally {
       setLoading(false);
@@ -105,7 +118,7 @@ const ViewClassSchedule = () => {
 
   const styles = {
     page: { padding: '28px 32px', minHeight: '100vh', background: '#f7f5ff' },
-    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
+    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 16 },
     filterBar: { marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap' },
     classCard: { background: '#f5f0ff', border: '1px solid #d3adf7', borderRadius: 8, padding: 12 },
     formHeader: { margin: '24px 0 16px 0' },
@@ -150,6 +163,34 @@ const ViewClassSchedule = () => {
           <Text>{loc}</Text>
         </Flex>
       ) : <Text type="secondary">—</Text>
+    },
+    {
+      title: 'Availability',
+      key: 'availability',
+      width: 130,
+      render: (_, c) => {
+        const isFull = c.enrolledStudents >= c.availability;
+        const isAlmostFull = c.enrolledStudents >= c.availability * 0.8;
+        const availableSpaces = c.availability - c.enrolledStudents;
+        
+        return (
+          <Flex align="center" gap={4} wrap="wrap">
+            <Tag color={isFull ? 'red' : isAlmostFull ? 'orange' : 'green'}>
+              {c.enrolledStudents}/{c.availability}
+            </Tag>
+            {!isFull && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                ({availableSpaces} left)
+              </Text>
+            )}
+            {isFull && (
+              <Tag color="red" style={{ fontSize: 11 }}>
+                Full
+              </Tag>
+            )}
+          </Flex>
+        );
+      }
     },
     {
       title: 'Teacher',
@@ -197,11 +238,32 @@ const ViewClassSchedule = () => {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <Title level={3} style={{ margin: 0, color: '#3b1fa3' }}>Class Schedule</Title>
-        <Flex gap={8}>
-          <Button icon={<ReloadOutlined />} onClick={fetchClasses} loading={loading}>
+        <Flex align="center" gap={16}>
+          {/* Back button for public users */}
+          {!isLoggedIn && (
+            <Button 
+              icon={<ArrowLeftOutlined />} 
+              onClick={() => navigate(-1)}
+              style={{ background: '#fff' }}
+            >
+              Back
+            </Button>
+          )}
+          <Title level={3} style={{ margin: 0, color: '#3b1fa3' }}>Class Schedule</Title>
+        </Flex>
+        <Flex gap={8} wrap="wrap">
+          {/* <Button icon={<ReloadOutlined />} onClick={fetchClasses} loading={loading}>
             Refresh
           </Button>
+          {!isLoggedIn && (
+            <Button
+              type="primary"
+              onClick={() => navigate('/register')}
+              style={{ background: '#52c41a', borderColor: '#52c41a' }}
+            >
+              Register Now
+            </Button>
+          )} */}
           {isAdminOrStaff && (
             <Button
               type="primary"

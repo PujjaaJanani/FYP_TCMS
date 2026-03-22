@@ -263,6 +263,7 @@ const AddClassSchedule = () => {
         startTime: values.timeRange[0].format('HH:mm:ss'),
         finishTime: values.timeRange[1].format('HH:mm:ss'),
         location: values.location,
+        availability: values.availability,
         authorityId: values.authorityId,
       };
 
@@ -415,7 +416,7 @@ const AddClassSchedule = () => {
               form={form}
               layout="vertical"
               onFinish={onFinish}
-              initialValues={{ classDay: 'Monday' }}
+              initialValues={{ classDay: 'Monday', availability: 30 }}
               size="large"
             >
               <Row gutter={[24, 16]}>
@@ -498,6 +499,24 @@ const AddClassSchedule = () => {
                   >
                     <Input 
                       placeholder="e.g., Room 101, Main Building" 
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label="Maximum Students"
+                    name="availability"
+                    rules={[
+                      { required: true, message: 'Please enter maximum students' },
+                      { type: 'number', min: 1, max: 100, message: 'Must be between 1 and 100' }
+                    ]}
+                  >
+                    <InputNumber 
+                      placeholder="e.g., 30"
+                      style={{ width: '100%' }}
+                      min={1}
+                      max={100}
                     />
                   </Form.Item>
                 </Col>
