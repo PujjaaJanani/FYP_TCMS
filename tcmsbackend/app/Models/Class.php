@@ -43,6 +43,7 @@ class ClassModel extends Model
         'availability',
         'authorityId',
         'subjectId',
+        'academicYear'
     ];
 
     /**

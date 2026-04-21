@@ -12,6 +12,7 @@ class Attendance extends Model
 
     protected $fillable = [
         'date',
+        'academicYear',
         'status',
         'classId',
         'authorityId',

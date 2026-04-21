@@ -39,8 +39,11 @@ class StudyMaterial extends Model
         'title',
         'description',
         'fileUrl',
+        'fileType',     
+        'fileName',
         'authorityId',
         'classId',
+        'academicYear'
     ];
 
     /**

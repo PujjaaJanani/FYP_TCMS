@@ -19,7 +19,8 @@ class Payment extends Model
         'receiptUrl',
         'remark',
         'registrationId',
-        'transactionId'
+        'transactionId',
+        'academicYear'
     ];
 
     // Make ALL attributes accessible (no restrictions)

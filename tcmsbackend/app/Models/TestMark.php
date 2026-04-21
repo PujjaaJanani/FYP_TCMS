@@ -40,7 +40,8 @@ class TestMark extends Model
         'testName',
         'testDate',
         'registrationId',
-        'classId'
+        'classId',
+        'academicYear'   // ADD THIS LINE
     ];
 
     /**
@@ -50,7 +51,8 @@ class TestMark extends Model
      */
     protected $casts = [
         'testDate' => 'date',
-        'mark' => 'float'
+        'mark' => 'float',
+        'academicYear' => 'integer'  // ADD THIS LINE
     ];
 
     /**

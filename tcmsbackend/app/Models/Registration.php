@@ -39,7 +39,9 @@ class Registration extends Model
         'status',
         'studentId',
         'classId',
-        'classIds', // Add this since your database has it
+        'classIds',
+        'enrollmentYear',  
+        'monthlyFee' 
     ];
 
     /**
