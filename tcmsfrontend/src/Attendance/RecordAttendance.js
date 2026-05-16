@@ -1,17 +1,37 @@
 // src/Pages/RecordAttendance.js - Enhanced with History Tab
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
-  Button, message, Typography, Card, Spin, Checkbox, DatePicker, Flex, Empty, Tabs, Tag, Modal
-} from 'antd';
-import { 
-  ArrowLeftOutlined, SaveOutlined, BookOutlined, HistoryOutlined, 
-  CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined, EyeOutlined,
-  EditOutlined, DeleteOutlined
-} from '@ant-design/icons';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import axios from 'axios';
-import { getToken, getUser } from '../Utils/LocalStorage';
-import dayjs from 'dayjs';
+  Button,
+  message,
+  Typography,
+  Card,
+  Spin,
+  Checkbox,
+  DatePicker,
+  Flex,
+  Empty,
+  Tabs,
+  Tag,
+  Modal,
+  Table,
+  Pagination,
+} from "antd";
+import {
+  ArrowLeftOutlined,
+  SaveOutlined,
+  BookOutlined,
+  HistoryOutlined,
+  CalendarOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  EyeOutlined,
+  EditOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import axios from "axios";
+import { getToken, getUser } from "../Utils/LocalStorage";
+import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
 
@@ -22,7 +42,7 @@ const RecordAttendance = () => {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('new');
+  const [activeTab, setActiveTab] = useState("new");
   const [tabLoading, setTabLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -33,11 +53,22 @@ const RecordAttendance = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingData, setEditingData] = useState({});
   
+  // Pagination state for students
+  const [currentStudentPage, setCurrentStudentPage] = useState(1);
+  const [studentPageSize, setStudentPageSize] = useState(10);
+  
+  // Pagination state for history
+  const [currentHistoryPage, setCurrentHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
+
+  // Select All state
+  const [isAllSelected, setIsAllSelected] = useState(true);
+
   const navigate = useNavigate();
   const { classId } = useParams();
   const location = useLocation();
   const classInfo = location.state?.classInfo;
-  const classColor = location.state?.classColor || '#3b1fa3';
+  const classColor = location.state?.classColor || "#3b1fa3";
   const user = getUser();
 
   const fetchStudents = async () => {
@@ -45,22 +76,26 @@ const RecordAttendance = () => {
     try {
       const res = await axios.get(
         `http://localhost:8000/api/attendance/class/${classId}/students`,
-        { headers: { Authorization: `Bearer ${getToken()}` } }
+        { headers: { Authorization: `Bearer ${getToken()}` } },
       );
-      
+
       if (res.data.success) {
         setStudents(res.data.data);
-        
-        // Initialize all students as Present
+        console.log(
+          `Loaded ${res.data.data.length} students for ${res.data.academic_year}`,
+        );
+
+        // Initialize all students as Present (default all selected)
         const initialData = {};
-        res.data.data.forEach(student => {
+        res.data.data.forEach((student) => {
           initialData[student.registrationId] = true;
         });
         setAttendanceData(initialData);
+        setIsAllSelected(true);
       }
     } catch (error) {
-      console.error('Fetch error:', error);
-      message.error('Failed to load students');
+      console.error("Fetch error:", error);
+      message.error("Failed to load students");
     } finally {
       setLoading(false);
       setPageLoading(false);
@@ -72,15 +107,16 @@ const RecordAttendance = () => {
     try {
       const res = await axios.get(
         `http://localhost:8000/api/attendance/class/${classId}/history`,
-        { headers: { Authorization: `Bearer ${getToken()}` } }
+        { headers: { Authorization: `Bearer ${getToken()}` } },
       );
-      
+
       if (res.data.success) {
         setHistory(res.data.data);
+        console.log(`Loaded history for ${res.data.academic_year}`);
       }
     } catch (error) {
-      console.error('History fetch error:', error);
-      message.error('Failed to load attendance history');
+      console.error("History fetch error:", error);
+      message.error("Failed to load attendance history");
     } finally {
       setHistoryLoading(false);
     }
@@ -91,26 +127,26 @@ const RecordAttendance = () => {
     setIsModalVisible(true);
     setSelectedHistoryDate(date);
     setIsEditing(false);
-    
+
     try {
       const res = await axios.get(
         `http://localhost:8000/api/attendance/class/${classId}/date/${date}`,
-        { headers: { Authorization: `Bearer ${getToken()}` } }
+        { headers: { Authorization: `Bearer ${getToken()}` } },
       );
-      
+
       if (res.data.success) {
         setHistoryDetails(res.data.data);
-        
+
         // Initialize editing data
         const initialEditData = {};
-        res.data.data.forEach(record => {
-          initialEditData[record.registrationId] = record.status === 'Present';
+        res.data.data.forEach((record) => {
+          initialEditData[record.registrationId] = record.status === "Present";
         });
         setEditingData(initialEditData);
       }
     } catch (error) {
-      console.error('History details error:', error);
-      message.error('Failed to load attendance details');
+      console.error("History details error:", error);
+      message.error("Failed to load attendance details");
       setIsModalVisible(false);
     } finally {
       setModalLoading(false);
@@ -130,9 +166,9 @@ const RecordAttendance = () => {
   };
 
   const handleEditCheckboxChange = (registrationId, checked) => {
-    setEditingData(prev => ({
+    setEditingData((prev) => ({
       ...prev,
-      [registrationId]: checked
+      [registrationId]: checked,
     }));
   };
 
@@ -141,24 +177,26 @@ const RecordAttendance = () => {
 
     setSubmitting(true);
     try {
-      const attendanceArray = Object.entries(editingData).map(([registrationId, isPresent]) => ({
-        registrationId: parseInt(registrationId),
-        status: isPresent ? 'Present' : 'Absent'
-      }));
+      const attendanceArray = Object.entries(editingData).map(
+        ([registrationId, isPresent]) => ({
+          registrationId: parseInt(registrationId),
+          status: isPresent ? "Present" : "Absent",
+        }),
+      );
 
       const res = await axios.post(
-        'http://localhost:8000/api/attendance/submit',
+        "http://localhost:8000/api/attendance/submit",
         {
           classId: parseInt(classId),
           authorityId: parseInt(user.id),
           date: selectedHistoryDate,
-          attendance: attendanceArray
+          attendance: attendanceArray,
         },
-        { headers: { Authorization: `Bearer ${getToken()}` } }
+        { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
       if (res.data.success) {
-        message.success('Attendance updated successfully!');
+        message.success("Attendance updated successfully!");
         setIsEditing(false);
         // Refresh the data with loading
         setModalLoading(true);
@@ -167,8 +205,10 @@ const RecordAttendance = () => {
         setModalLoading(false);
       }
     } catch (error) {
-      console.error('Update error:', error);
-      message.error(error.response?.data?.message || 'Failed to update attendance');
+      console.error("Update error:", error);
+      message.error(
+        error.response?.data?.message || "Failed to update attendance",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -176,30 +216,32 @@ const RecordAttendance = () => {
 
   const handleDeleteAttendance = (date) => {
     Modal.confirm({
-      title: 'Delete Attendance Record',
-      content: `Are you sure you want to delete the attendance record for ${dayjs(date).format('MMMM D, YYYY')}? This action cannot be undone.`,
-      okText: 'Delete',
-      okType: 'danger',
-      cancelText: 'Cancel',
+      title: "Delete Attendance Record",
+      content: `Are you sure you want to delete the attendance record for ${dayjs(date).format("MMMM D, YYYY")}? This action cannot be undone.`,
+      okText: "Delete",
+      okType: "danger",
+      cancelText: "Cancel",
       onOk: async () => {
         try {
           const res = await axios.delete(
             `http://localhost:8000/api/attendance/class/${classId}/date/${date}`,
-            { headers: { Authorization: `Bearer ${getToken()}` } }
+            { headers: { Authorization: `Bearer ${getToken()}` } },
           );
 
           if (res.data.success) {
-            message.success('Attendance record deleted successfully');
+            message.success("Attendance record deleted successfully");
             closeModal();
             setHistoryLoading(true);
             await fetchHistory();
             setHistoryLoading(false);
           }
         } catch (error) {
-          console.error('Delete error:', error);
-          message.error(error.response?.data?.message || 'Failed to delete attendance');
+          console.error("Delete error:", error);
+          message.error(
+            error.response?.data?.message || "Failed to delete attendance",
+          );
         }
-      }
+      },
     });
   };
 
@@ -211,11 +253,14 @@ const RecordAttendance = () => {
   const handleTabChange = async (key) => {
     setActiveTab(key);
     setTabLoading(true);
-    
-    if (key === 'history') {
+    // Reset pagination when switching tabs
+    setCurrentStudentPage(1);
+    setCurrentHistoryPage(1);
+
+    if (key === "history") {
       await fetchHistory();
     }
-    
+
     // Small delay to ensure smooth transition
     setTimeout(() => {
       setTabLoading(false);
@@ -223,10 +268,25 @@ const RecordAttendance = () => {
   };
 
   const handleCheckboxChange = (registrationId, checked) => {
-    setAttendanceData(prev => ({
+    setAttendanceData((prev) => ({
       ...prev,
-      [registrationId]: checked
+      [registrationId]: checked,
     }));
+    
+    // Update select all state when individual checkboxes change
+    const newAttendanceData = { ...attendanceData, [registrationId]: checked };
+    const allSelected = Object.values(newAttendanceData).every(value => value === true);
+    const noneSelected = Object.values(newAttendanceData).every(value => value === false);
+    setIsAllSelected(allSelected);
+  };
+
+  const handleSelectAll = (checked) => {
+    const updatedData = {};
+    students.forEach((student) => {
+      updatedData[student.registrationId] = checked;
+    });
+    setAttendanceData(updatedData);
+    setIsAllSelected(checked);
   };
 
   const handleSubmit = async (e) => {
@@ -236,33 +296,35 @@ const RecordAttendance = () => {
     }
 
     if (!selectedDate) {
-      message.error('Please select a date');
+      message.error("Please select a date");
       return;
     }
 
     setSubmitting(true);
     try {
-      const attendanceArray = Object.entries(attendanceData).map(([registrationId, isPresent]) => ({
-        registrationId: parseInt(registrationId),
-        status: isPresent ? 'Present' : 'Absent'
-      }));
+      const attendanceArray = Object.entries(attendanceData).map(
+        ([registrationId, isPresent]) => ({
+          registrationId: parseInt(registrationId),
+          status: isPresent ? "Present" : "Absent",
+        }),
+      );
 
       const res = await axios.post(
-        'http://localhost:8000/api/attendance/submit',
+        "http://localhost:8000/api/attendance/submit",
         {
           classId: parseInt(classId),
           authorityId: parseInt(user.id),
-          date: selectedDate.format('YYYY-MM-DD'),
-          attendance: attendanceArray
+          date: selectedDate.format("YYYY-MM-DD"),
+          attendance: attendanceArray,
         },
-        { headers: { Authorization: `Bearer ${getToken()}` } }
+        { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
       if (res.data.success) {
-        message.success('Attendance recorded successfully!');
-        
+        message.success("Attendance recorded successfully!");
+
         // Switch to history tab with loading
-        setActiveTab('history');
+        setActiveTab("history");
         setTabLoading(true);
         await fetchHistory();
         setTimeout(() => {
@@ -270,78 +332,115 @@ const RecordAttendance = () => {
         }, 300);
       }
     } catch (error) {
-      console.error('Submit error:', error);
-      message.error(error.response?.data?.message || 'Failed to submit attendance');
+      console.error("Submit error:", error);
+      message.error(
+        error.response?.data?.message || "Failed to submit attendance",
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Get current page data for students
+  const getCurrentStudentData = () => {
+    const startIndex = (currentStudentPage - 1) * studentPageSize;
+    const endIndex = startIndex + studentPageSize;
+    return students.slice(startIndex, endIndex);
+  };
+
+  // Get current page data for history
+  const getCurrentHistoryData = () => {
+    const startIndex = (currentHistoryPage - 1) * historyPageSize;
+    const endIndex = startIndex + historyPageSize;
+    return history.slice(startIndex, endIndex);
+  };
+
   const styles = {
-    page: { padding: '28px 32px', minHeight: '100vh', background: '#f7f5ff' },
+    page: { padding: "28px 32px", minHeight: "100vh", background: "#f7f5ff" },
     classInfoCard: {
       backgroundColor: classColor,
-      color: 'white',
+      color: "white",
       borderRadius: 12,
-      padding: '20px 24px',
+      padding: "20px 24px",
       marginBottom: 24,
-      boxShadow: `0 8px 16px ${classColor}80`
+      boxShadow: `0 8px 16px ${classColor}80`,
     },
     attendanceCard: {
       borderRadius: 12,
-      border: `2px solid ${classColor}40`,  
-      boxShadow: `0 12px 28px rgba(0,0,0,0.2), 0 2px 10px rgba(0,0,0,0.1)`
+      border: `2px solid ${classColor}40`,
+      boxShadow: `0 12px 28px rgba(0,0,0,0.2), 0 2px 10px rgba(0,0,0,0.1)`,
     },
     tableHeader: {
-      backgroundColor: '#f0f0f0',
-      color: '#000000',
-      padding: '12px 20px',
+      backgroundColor: "#f0f0f0",
+      color: "#000000",
+      padding: "12px 20px",
       fontWeight: 700,
       fontSize: 16,
-      display: 'grid',
-      gridTemplateColumns: '1fr auto',
+      display: "grid",
+      gridTemplateColumns: "1fr auto",
       borderTopLeftRadius: 12,
-      borderTopRightRadius: 12
+      borderTopRightRadius: 12,
     },
     studentRow: {
-      display: 'grid',
-      gridTemplateColumns: '1fr auto',
-      padding: '16px 20px',
-      borderBottom: '1px solid #f0f0f0',
-      alignItems: 'center',
-      transition: 'background 0.3s ease'
+      display: "grid",
+      gridTemplateColumns: "1fr auto",
+      padding: "16px 20px",
+      borderBottom: "1px solid #f0f0f0",
+      alignItems: "center",
+      transition: "background 0.3s ease",
     },
     historyCard: {
       marginBottom: 12,
-      cursor: 'pointer',
+      cursor: "pointer",
       border: `2px solid ${classColor}30`,
-      transition: 'all 0.3s ease'
+      transition: "all 0.3s ease",
     },
     detailsCard: {
       border: `2px solid ${classColor}`,
-      marginTop: 16
+      marginTop: 16,
     },
     tabs: {
-      marginTop: 16
+      marginTop: 16,
     },
     tabBar: {
-      marginBottom: 20
+      marginBottom: 20,
     },
     loadingContainer: {
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '300px',
-      width: '100%',
-      background: '#fff',
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      minHeight: "300px",
+      width: "100%",
+      background: "#fff",
       borderRadius: 12,
-      padding: '40px'
-    }
+      padding: "40px",
+    },
+    paginationContainer: {
+      marginTop: 24,
+      display: "flex",
+      justifyContent: "flex-end",
+    },
+    selectAllContainer: {
+      padding: "12px 20px",
+      borderBottom: "1px solid #f0f0f0",
+      backgroundColor: "#fafafa",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+    },
   };
 
   if (pageLoading) {
     return (
-      <div style={{ ...styles.page, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+      <div
+        style={{
+          ...styles.page,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+        }}
+      >
         <Spin size="large" />
       </div>
     );
@@ -349,7 +448,7 @@ const RecordAttendance = () => {
 
   const tabItems = [
     {
-      key: 'new',
+      key: "new",
       label: (
         <span>
           <CalendarOutlined /> Record New
@@ -366,6 +465,10 @@ const RecordAttendance = () => {
                 format="YYYY-MM-DD"
                 size="large"
                 style={{ width: 200 }}
+                disabledDate={(current) => {
+                  // Disable future dates (only allow today and past dates)
+                  return current && current > dayjs().endOf('day');
+                }}
               />
             </Flex>
           </Card>
@@ -376,53 +479,105 @@ const RecordAttendance = () => {
             </div>
           ) : students.length === 0 ? (
             <Card>
-              <Empty 
+              <Empty
                 description="No students enrolled in this class"
                 image={<BookOutlined style={{ fontSize: 60, color: classColor }} />}
               />
             </Card>
           ) : (
-            <Card style={styles.attendanceCard} styles={{ body: { padding: 0 } }}>
-              <div style={styles.tableHeader}>
-                <span>Name</span>
-                <span>Status</span>
-              </div>
-              
-              {students.map((student, index) => (
-                <div
-                  key={student.registrationId}
-                  style={{
-                    ...styles.studentRow,
-                    background: index % 2 === 0 ? 'white' : '#fafafa'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = `${classColor}10`;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = index % 2 === 0 ? 'white' : '#fafafa';
-                  }}
-                >
-                  <Text strong style={{ fontSize: 15 }}>
-                    {student.studentName}
-                  </Text>
+            <>
+              <Card
+                style={styles.attendanceCard}
+                styles={{ body: { padding: 0 } }}
+              >
+                {/* Select All Row */}
+                <div style={styles.selectAllContainer}>
                   <Checkbox
-                    checked={attendanceData[student.registrationId]}
-                    onChange={(e) => handleCheckboxChange(student.registrationId, e.target.checked)}
-                    style={{
-                      transform: 'scale(1.5)',
-                      accentColor: classColor
-                    }}
-                  />
+                    checked={isAllSelected}
+                    indeterminate={!isAllSelected && Object.values(attendanceData).some(v => v === true) && Object.values(attendanceData).some(v => v === false)}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  >
+                    <Text strong style={{ fontSize: 14 }}>
+                      {isAllSelected ? "Deselect All" : "Select All (Present)"}
+                    </Text>
+                  </Checkbox>
+                  {!isAllSelected && Object.values(attendanceData).some(v => v === true) && Object.values(attendanceData).some(v => v === false) && (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Partially selected
+                    </Text>
+                  )}
                 </div>
-              ))}
-            </Card>
+
+                <div style={styles.tableHeader}>
+                  <span>Name</span>
+                  <span>Status</span>
+                </div>
+
+                {getCurrentStudentData().map((student, index) => (
+                  <div
+                    key={student.registrationId}
+                    style={{
+                      ...styles.studentRow,
+                      background: index % 2 === 0 ? "white" : "#fafafa",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = `${classColor}10`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background =
+                        index % 2 === 0 ? "white" : "#fafafa";
+                    }}
+                  >
+                    <Text strong style={{ fontSize: 15 }}>
+                      {student.studentName}
+                    </Text>
+                    <Checkbox
+                      checked={attendanceData[student.registrationId]}
+                      onChange={(e) =>
+                        handleCheckboxChange(
+                          student.registrationId,
+                          e.target.checked,
+                        )
+                      }
+                      style={{
+                        transform: "scale(1.5)",
+                        accentColor: classColor,
+                      }}
+                    />
+                  </div>
+                ))}
+              </Card>
+
+              {/* Pagination for students */}
+              <div style={styles.paginationContainer}>
+                <Pagination
+                  current={currentStudentPage}
+                  pageSize={studentPageSize}
+                  total={students.length}
+                  showSizeChanger={true}
+                  showTotal={(total) => `Total ${total} students`}
+                  pageSizeOptions={['10', '20', '50', '100']}
+                  onChange={(page, newPageSize) => {
+                    setCurrentStudentPage(page);
+                    if (newPageSize !== studentPageSize) {
+                      setStudentPageSize(newPageSize);
+                      setCurrentStudentPage(1);
+                    }
+                  }}
+                  onShowSizeChange={(current, size) => {
+                    setStudentPageSize(size);
+                    setCurrentStudentPage(1);
+                  }}
+                />
+              </div>
+            </>
           )}
 
           <Flex gap={8} justify="center" style={{ marginTop: 24 }}>
             <Button
               size="large"
               htmlType="button"
-              onClick={() => navigate('/staff/attendance')}
+              onClick={() => navigate("/staff/attendance")}
               style={{ minWidth: 120 }}
             >
               Cancel
@@ -436,19 +591,19 @@ const RecordAttendance = () => {
               loading={submitting}
               disabled={students.length === 0}
               style={{
-                background: '#52c41a',
-                borderColor: '#52c41a',
-                minWidth: 120
+                background: "#52c41a",
+                borderColor: "#52c41a",
+                minWidth: 120,
               }}
             >
               Submit
             </Button>
           </Flex>
         </>
-      )
+      ),
     },
     {
-      key: 'history',
+      key: "history",
       label: (
         <span>
           <HistoryOutlined /> View History
@@ -462,14 +617,18 @@ const RecordAttendance = () => {
             </div>
           ) : history.length === 0 ? (
             <Card>
-              <Empty 
+              <Empty
                 description="No attendance records yet"
-                image={<HistoryOutlined style={{ fontSize: 60, color: classColor }} />}
+                image={
+                  <HistoryOutlined
+                    style={{ fontSize: 60, color: classColor }}
+                  />
+                }
               />
             </Card>
           ) : (
             <>
-              {history.map((record) => (
+              {getCurrentHistoryData().map((record) => (
                 <Card
                   key={record.date}
                   style={styles.historyCard}
@@ -481,13 +640,13 @@ const RecordAttendance = () => {
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = `${classColor}30`;
-                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.boxShadow = "none";
                   }}
                 >
                   <Flex justify="space-between" align="center">
                     <div>
                       <Text strong style={{ fontSize: 16, color: classColor }}>
-                        📅 {dayjs(record.date).format('dddd, MMMM D, YYYY')}
+                        📅 {dayjs(record.date).format("dddd, MMMM D, YYYY")}
                       </Text>
                       <div style={{ marginTop: 8 }}>
                         <Tag color="blue">Total: {record.totalStudents}</Tag>
@@ -499,28 +658,54 @@ const RecordAttendance = () => {
                         </Tag>
                       </div>
                     </div>
-                    <Button 
-                      type="primary" 
-                      icon={<EyeOutlined />} 
-                      style={{ background: classColor, borderColor: classColor }}
+                    <Button
+                      type="primary"
+                      icon={<EyeOutlined />}
+                      style={{
+                        background: classColor,
+                        borderColor: classColor,
+                      }}
                     >
                       View Details
                     </Button>
                   </Flex>
                 </Card>
               ))}
+              
+              {/* Pagination for history */}
+              <div style={styles.paginationContainer}>
+                <Pagination
+                  current={currentHistoryPage}
+                  pageSize={historyPageSize}
+                  total={history.length}
+                  showSizeChanger={true}
+                  showTotal={(total) => `Total ${total} attendance records`}
+                  pageSizeOptions={['10', '20', '50', '100']}
+                  onChange={(page, newPageSize) => {
+                    setCurrentHistoryPage(page);
+                    if (newPageSize !== historyPageSize) {
+                      setHistoryPageSize(newPageSize);
+                      setCurrentHistoryPage(1);
+                    }
+                  }}
+                  onShowSizeChange={(current, size) => {
+                    setHistoryPageSize(size);
+                    setCurrentHistoryPage(1);
+                  }}
+                />
+              </div>
             </>
           )}
         </>
-      )
-    }
+      ),
+    },
   ];
 
   return (
     <div style={styles.page}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => navigate('/staff/attendance')}
+        onClick={() => navigate("/staff/attendance")}
         style={{ marginBottom: 16 }}
       >
         Back to My Classes
@@ -528,18 +713,38 @@ const RecordAttendance = () => {
 
       {classInfo && (
         <div style={styles.classInfoCard}>
-          <Title level={3} style={{ color: 'white', margin: 0, marginBottom: 12, textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
-            {classInfo.subjectName} - {classInfo.form}
-          </Title>
-          <Flex gap={16} wrap="wrap">
-            <Text style={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+            }}
+          >
+            <div>
+              <Title
+                level={3}
+                style={{
+                  color: "white",
+                  margin: 0,
+                  marginBottom: 12,
+                  textShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                }}
+              >
+                {classInfo.subjectName} - {classInfo.form}
+              </Title>
+            </div>
+          </div>
+          <Flex gap={16} wrap="wrap" style={{ marginTop: 8 }}>
+            <Text style={{ color: "rgba(255,255,255,0.95)", fontWeight: 500 }}>
               📅 {classInfo.classDay}
             </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}>
+            <Text style={{ color: "rgba(255,255,255,0.95)", fontWeight: 500 }}>
               🕐 {classInfo.startTime} - {classInfo.finishTime}
             </Text>
             {classInfo.location && (
-              <Text style={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}>
+              <Text
+                style={{ color: "rgba(255,255,255,0.95)", fontWeight: 500 }}
+              >
                 📍 {classInfo.location}
               </Text>
             )}
@@ -547,7 +752,7 @@ const RecordAttendance = () => {
         </div>
       )}
 
-      <Tabs 
+      <Tabs
         activeKey={activeTab}
         onChange={handleTabChange}
         items={tabItems}
@@ -562,7 +767,12 @@ const RecordAttendance = () => {
         title={
           <Flex align="center" gap={8}>
             <CalendarOutlined style={{ color: classColor }} />
-            <span>Attendance Details - {selectedHistoryDate ? dayjs(selectedHistoryDate).format('MMMM D, YYYY') : ''}</span>
+            <span>
+              Attendance Details -{" "}
+              {selectedHistoryDate
+                ? dayjs(selectedHistoryDate).format("MMMM D, YYYY")
+                : ""}
+            </span>
           </Flex>
         }
         open={isModalVisible}
@@ -570,54 +780,51 @@ const RecordAttendance = () => {
         footer={[
           isEditing ? (
             <React.Fragment key="edit-footer">
-              <Button 
-                key="cancel-edit" 
-                onClick={() => setIsEditing(false)}
-              >
+              <Button key="cancel-edit" onClick={() => setIsEditing(false)}>
                 Cancel
               </Button>
-              <Button 
-                key="save" 
-                type="primary" 
+              <Button
+                key="save"
+                type="primary"
                 loading={submitting}
-                onClick={handleUpdateAttendance} 
-                style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                onClick={handleUpdateAttendance}
+                style={{ background: "#52c41a", borderColor: "#52c41a" }}
               >
                 Save Changes
               </Button>
             </React.Fragment>
           ) : (
             <React.Fragment key="view-footer">
-              <Button 
-                key="delete" 
-                danger 
+              <Button
+                key="delete"
+                danger
                 icon={<DeleteOutlined />}
                 onClick={() => handleDeleteAttendance(selectedHistoryDate)}
               >
                 Delete
               </Button>
-              <Button 
-                key="edit" 
+              <Button
+                key="edit"
                 icon={<EditOutlined />}
                 onClick={handleEditToggle}
               >
                 Edit
               </Button>
-              <Button 
-                key="close" 
-                type="primary" 
-                onClick={closeModal} 
+              <Button
+                key="close"
+                type="primary"
+                onClick={closeModal}
                 style={{ background: classColor, borderColor: classColor }}
               >
                 Close
               </Button>
             </React.Fragment>
-          )
+          ),
         ]}
-        width={600}
+        width={700}
       >
         {modalLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
             <Spin size="large" />
           </div>
         ) : historyDetails.length === 0 ? (
@@ -626,32 +833,56 @@ const RecordAttendance = () => {
           <div>
             {/* Summary Stats */}
             {!isEditing && (
-              <Card 
-                style={{ marginBottom: 16, background: `${classColor}10`, border: `1px solid ${classColor}30` }}
-                styles={{ body: { padding: '16px' } }}
+              <Card
+                style={{
+                  marginBottom: 16,
+                  background: `${classColor}10`,
+                  border: `1px solid ${classColor}30`,
+                }}
+                styles={{ body: { padding: "16px" } }}
               >
                 <Flex justify="space-around">
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: '#1890ff' }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: "#1890ff",
+                      }}
+                    >
                       {historyDetails.length}
                     </div>
                     <Text type="secondary">Total Students</Text>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: '#52c41a' }}>
-                      {isEditing 
-                        ? Object.values(editingData).filter(v => v === true).length
-                        : historyDetails.filter(r => r.status === 'Present').length
-                      }
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: "#52c41a",
+                      }}
+                    >
+                      {isEditing
+                        ? Object.values(editingData).filter((v) => v === true)
+                            .length
+                        : historyDetails.filter((r) => r.status === "Present")
+                            .length}
                     </div>
                     <Text type="secondary">Present</Text>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: '#ff4d4f' }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: "#ff4d4f",
+                      }}
+                    >
                       {isEditing
-                        ? Object.values(editingData).filter(v => v === false).length
-                        : historyDetails.filter(r => r.status === 'Absent').length
-                      }
+                        ? Object.values(editingData).filter((v) => v === false)
+                            .length
+                        : historyDetails.filter((r) => r.status === "Absent")
+                            .length}
                     </div>
                     <Text type="secondary">Absent</Text>
                   </div>
@@ -659,20 +890,25 @@ const RecordAttendance = () => {
               </Card>
             )}
 
-            {/* Student List */}
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            {/* Student List - No Pagination */}
+            <div style={{ maxHeight: "500px", overflowY: "auto" }}>
               {isEditing ? (
                 // Editing mode with checkboxes
-                <Card styles={{ body: { padding: 0 } }} style={{ borderRadius: 8, overflow: 'hidden' }}>
-                  <div style={{
-                    backgroundColor: '#f0f0f0',
-                    color: '#000000',
-                    padding: '12px 20px',
-                    fontWeight: 700,
-                    fontSize: 16,
-                    display: 'grid',
-                    gridTemplateColumns: '1fr auto'
-                  }}>
+                <Card
+                  styles={{ body: { padding: 0 } }}
+                  style={{ borderRadius: 8, overflow: "hidden" }}
+                >
+                  <div
+                    style={{
+                      backgroundColor: "#f0f0f0",
+                      color: "#000000",
+                      padding: "12px 20px",
+                      fontWeight: 700,
+                      fontSize: 16,
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto",
+                    }}
+                  >
                     <span>Name</span>
                     <span>Present</span>
                   </div>
@@ -680,21 +916,31 @@ const RecordAttendance = () => {
                     <div
                       key={record.attendanceId}
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr auto',
-                        padding: '16px 20px',
-                        borderBottom: index < historyDetails.length - 1 ? '1px solid #f0f0f0' : 'none',
-                        background: index % 2 === 0 ? 'white' : '#fafafa',
-                        alignItems: 'center'
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto",
+                        padding: "16px 20px",
+                        borderBottom:
+                          index < historyDetails.length - 1
+                            ? "1px solid #f0f0f0"
+                            : "none",
+                        background: index % 2 === 0 ? "white" : "#fafafa",
+                        alignItems: "center",
                       }}
                     >
-                      <Text strong style={{ fontSize: 15 }}>{record.studentName}</Text>
+                      <Text strong style={{ fontSize: 15 }}>
+                        {record.studentName}
+                      </Text>
                       <Checkbox
                         checked={editingData[record.registrationId]}
-                        onChange={(e) => handleEditCheckboxChange(record.registrationId, e.target.checked)}
+                        onChange={(e) =>
+                          handleEditCheckboxChange(
+                            record.registrationId,
+                            e.target.checked,
+                          )
+                        }
                         style={{
-                          transform: 'scale(1.5)',
-                          accentColor: classColor
+                          transform: "scale(1.5)",
+                          accentColor: classColor,
                         }}
                       />
                     </div>
@@ -706,21 +952,34 @@ const RecordAttendance = () => {
                   <div
                     key={record.attendanceId}
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '12px 16px',
-                      borderBottom: index < historyDetails.length - 1 ? '1px solid #f0f0f0' : 'none',
-                      background: index % 2 === 0 ? 'white' : '#fafafa'
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "12px 16px",
+                      borderBottom:
+                        index < historyDetails.length - 1
+                          ? "1px solid #f0f0f0"
+                          : "none",
+                      background: index % 2 === 0 ? "white" : "#fafafa",
                     }}
                   >
-                    <Text strong style={{ fontSize: 15 }}>{record.studentName}</Text>
-                    {record.status === 'Present' ? (
-                      <Tag color="green" icon={<CheckCircleOutlined />} style={{ fontSize: 14, padding: '4px 12px' }}>
+                    <Text strong style={{ fontSize: 15 }}>
+                      {record.studentName}
+                    </Text>
+                    {record.status === "Present" ? (
+                      <Tag
+                        color="green"
+                        icon={<CheckCircleOutlined />}
+                        style={{ fontSize: 14, padding: "4px 12px" }}
+                      >
                         Present
                       </Tag>
                     ) : (
-                      <Tag color="red" icon={<CloseCircleOutlined />} style={{ fontSize: 14, padding: '4px 12px' }}>
+                      <Tag
+                        color="red"
+                        icon={<CloseCircleOutlined />}
+                        style={{ fontSize: 14, padding: "4px 12px" }}
+                      >
                         Absent
                       </Tag>
                     )}

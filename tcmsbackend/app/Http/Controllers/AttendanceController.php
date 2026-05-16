@@ -13,23 +13,26 @@ use Illuminate\Support\Facades\Log;
 class AttendanceController extends Controller
 {
     /**
-     * Get all classes for the logged-in staff member
+     * Get all classes for the logged-in staff member for CURRENT ACADEMIC YEAR only
      */
     public function getMyClasses(Request $request)
     {
         try {
             $user = $request->user();
             $authorityId = $user->getKey();
-            
+            $currentYear = date('Y');
+
             $classes = DB::table('class')
                 ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                 ->where('class.authorityId', $authorityId)
+                ->where('class.academicYear', $currentYear)
                 ->select(
                     'class.classId',
                     'class.classDay',
                     'class.startTime',
                     'class.finishTime',
                     'class.location',
+                    'class.academicYear',
                     'subject.name as subjectName',
                     'subject.form'
                 )
@@ -44,7 +47,8 @@ class AttendanceController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $classes
+                'data' => $classes,
+                'academic_year' => $currentYear
             ]);
 
         } catch (\Exception $e) {
@@ -57,13 +61,16 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Get students for a class to record attendance
+     * Get students for a class to record attendance (only current year students)
      */
     public function getClassStudents($classId)
     {
         try {
-            // Get all approved registrations for this class
+            $currentYear = date('Y');
+
+            // Get all approved registrations for this class for current year only
             $registrations = Registration::where('status', 'Approved')
+                ->where('enrollmentYear', $currentYear)
                 ->join('student', 'registration.studentId', '=', 'student.studentId')
                 ->select(
                     'registration.registrationId',
@@ -76,18 +83,18 @@ class AttendanceController extends Controller
                 ->get();
 
             // Filter students registered for this specific class
-            $filteredStudents = $registrations->filter(function($reg) use ($classId) {
+            $filteredStudents = $registrations->filter(function ($reg) use ($classId) {
                 // Check if main classId matches
                 if ($reg->classId == $classId) {
                     return true;
                 }
-                
+
                 // Check if classIds contains this classId
                 if ($reg->classIds) {
                     $classIdsArray = array_map('trim', explode(',', $reg->classIds));
-                    return in_array((string)$classId, $classIdsArray);
+                    return in_array((string) $classId, $classIdsArray);
                 }
-                
+
                 return false;
             });
 
@@ -96,13 +103,14 @@ class AttendanceController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $uniqueStudents->map(function($student) {
+                'data' => $uniqueStudents->map(function ($student) {
                     return [
                         'registrationId' => $student->registrationId,
                         'studentId' => $student->studentId,
                         'studentName' => $student->studentName
                     ];
-                })
+                }),
+                'academic_year' => $currentYear
             ]);
 
         } catch (\Exception $e) {
@@ -139,14 +147,18 @@ class AttendanceController extends Controller
         try {
             DB::beginTransaction();
 
+            $currentYear = date('Y');
+
             // Check if attendance already exists for this class and date - using raw where with DATE()
             $existingAttendance = Attendance::where('classId', $request->classId)
+                ->where('academicYear', $currentYear)
                 ->where(DB::raw('DATE(date)'), '=', $request->date)
                 ->first();
 
             if ($existingAttendance) {
                 // Delete existing attendance for this date - using raw where with DATE()
                 Attendance::where('classId', $request->classId)
+                    ->where('academicYear', $currentYear)
                     ->where(DB::raw('DATE(date)'), '=', $request->date)
                     ->delete();
             }
@@ -158,7 +170,8 @@ class AttendanceController extends Controller
                     'authorityId' => $request->authorityId,
                     'registrationId' => $record['registrationId'],
                     'date' => $request->date,
-                    'status' => $record['status']
+                    'status' => $record['status'],
+                    'academicYear' => $currentYear
                 ]);
             }
 
@@ -180,13 +193,16 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Get attendance history for a class
+     * Get attendance history for a class (only current year)
      */
     public function getClassAttendanceHistory($classId)
     {
         try {
+            $currentYear = date('Y');
+
             $attendanceRecords = DB::table('attendance')
                 ->where('attendance.classId', $classId)
+                ->where('attendance.academicYear', $currentYear)
                 ->join('registration', 'attendance.registrationId', '=', 'registration.registrationId')
                 ->join('student', 'registration.studentId', '=', 'student.studentId')
                 ->select(
@@ -198,7 +214,7 @@ class AttendanceController extends Controller
                 )
                 ->orderBy('attendance.date', 'desc')
                 ->get()
-                ->groupBy(function($item) {
+                ->groupBy(function ($item) {
                     return date('Y-m-d', strtotime($item->date));
                 });
 
@@ -206,7 +222,7 @@ class AttendanceController extends Controller
             foreach ($attendanceRecords as $date => $records) {
                 $presentCount = $records->where('status', 'Present')->count();
                 $absentCount = $records->where('status', 'Absent')->count();
-                
+
                 $result[] = [
                     'date' => $date,
                     'totalStudents' => $records->count(),
@@ -218,7 +234,8 @@ class AttendanceController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $result
+                'data' => $result,
+                'academic_year' => $currentYear
             ]);
 
         } catch (\Exception $e) {
@@ -231,13 +248,16 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Get attendance for a specific date
+     * Get attendance for a specific date (only current year)
      */
     public function getAttendanceByDate($classId, $date)
     {
         try {
+            $currentYear = date('Y');
+
             $attendance = DB::table('attendance')
                 ->where('attendance.classId', $classId)
+                ->where('attendance.academicYear', $currentYear)
                 ->where(DB::raw('DATE(attendance.date)'), '=', $date)
                 ->join('registration', 'attendance.registrationId', '=', 'registration.registrationId')
                 ->join('student', 'registration.studentId', '=', 'student.studentId')
@@ -253,7 +273,8 @@ class AttendanceController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $attendance
+                'data' => $attendance,
+                'academic_year' => $currentYear
             ]);
 
         } catch (\Exception $e) {
@@ -266,13 +287,16 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Delete attendance for a specific date
+     * Delete attendance for a specific date (only current year)
      */
     public function deleteAttendanceByDate($classId, $date)
     {
         try {
+            $currentYear = date('Y');
+
             $deleted = DB::table('attendance')
                 ->where('classId', $classId)
+                ->where('academicYear', $currentYear)
                 ->where(DB::raw('DATE(date)'), '=', $date)
                 ->delete();
 
@@ -280,7 +304,8 @@ class AttendanceController extends Controller
                 Log::info('Attendance deleted', [
                     'classId' => $classId,
                     'date' => $date,
-                    'recordsDeleted' => $deleted
+                    'recordsDeleted' => $deleted,
+                    'academicYear' => $currentYear
                 ]);
 
                 return response()->json([
@@ -299,6 +324,141 @@ class AttendanceController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete attendance'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get attendance history for a class by academic year (archive view)
+     */
+    public function getClassAttendanceHistoryByYear($classId, Request $request)
+{
+    try {
+        $academicYear = $request->query('academicYear');
+
+        if (empty($academicYear)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Academic year is required'
+            ], 422);
+        }
+
+        // Add debug logging
+        \Log::info('Fetching attendance history', [
+            'classId' => $classId,
+            'academicYear' => $academicYear
+        ]);
+
+        $attendanceRecords = DB::table('attendance')
+            ->where('attendance.classId', $classId)
+            ->where('attendance.academicYear', $academicYear)
+            ->join('registration', 'attendance.registrationId', '=', 'registration.registrationId')
+            ->join('student', 'registration.studentId', '=', 'student.studentId')
+            ->select(
+                'attendance.attendanceId',
+                'attendance.date',
+                'attendance.status',
+                'student.name as studentName',
+                'student.studentId',
+                'registration.registrationId'
+            )
+            ->orderBy('attendance.date', 'desc')
+            ->get();
+
+        // Add debug logging
+        \Log::info('Attendance records found', [
+            'count' => $attendanceRecords->count(),
+            'records' => $attendanceRecords->toArray()
+        ]);
+
+        if ($attendanceRecords->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => []
+            ]);
+        }
+
+        $groupedRecords = $attendanceRecords->groupBy(function($item) {
+            return date('Y-m-d', strtotime($item->date));
+        });
+
+        $result = [];
+        foreach ($groupedRecords as $date => $records) {
+            $presentCount = $records->where('status', 'Present')->count();
+            $absentCount = $records->where('status', 'Absent')->count();
+            
+            $result[] = [
+                'date' => $date,
+                'totalStudents' => $records->count(),
+                'presentCount' => $presentCount,
+                'absentCount' => $absentCount,
+                'records' => $records
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+            'academic_year' => (int) $academicYear
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('getClassAttendanceHistoryByYear failed: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to fetch attendance history: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+    /**
+     * Get attendance for a specific date by academic year (archive view)
+     */
+    public function getAttendanceByDateByYear($classId, $date, Request $request)
+    {
+        try {
+            $academicYear = $request->query('academicYear');
+
+            if (empty($academicYear)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Academic year is required'
+                ], 422);
+            }
+
+            Log::info('Fetching attendance details archive', [
+                'classId' => $classId,
+                'date' => $date,
+                'academicYear' => $academicYear
+            ]);
+
+            $attendance = DB::table('attendance')
+                ->where('attendance.classId', $classId)
+                ->where('attendance.academicYear', $academicYear)
+                ->where(DB::raw('DATE(attendance.date)'), '=', $date)
+                ->join('registration', 'attendance.registrationId', '=', 'registration.registrationId')
+                ->join('student', 'registration.studentId', '=', 'student.studentId')
+                ->select(
+                    'attendance.attendanceId',
+                    'attendance.registrationId',
+                    'attendance.status',
+                    'student.name as studentName',
+                    'student.studentId'
+                )
+                ->orderBy('student.name')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $attendance,
+                'academic_year' => (int) $academicYear
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('getAttendanceByDateByYear failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch attendance: ' . $e->getMessage()
             ], 500);
         }
     }

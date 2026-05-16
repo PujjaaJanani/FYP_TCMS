@@ -17,6 +17,7 @@ const StaffAttendance = () => {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const navigate = useNavigate();
 
   const fetchMyClasses = async () => {
@@ -27,8 +28,11 @@ const StaffAttendance = () => {
       });
       if (res.data.success) {
         setClasses(res.data.data);
+        if (res.data.academic_year) {
+          setCurrentYear(res.data.academic_year);
+        }
         if (res.data.data.length === 0) {
-          message.info('You are not assigned to any classes yet');
+          message.info(`You are not assigned to any classes for ${currentYear}`);
         }
       }
     } catch (error) {
@@ -100,6 +104,11 @@ const StaffAttendance = () => {
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 32
+    },
+    yearTag: {
+      marginLeft: 12,
+      fontSize: 14,
+      padding: '4px 12px'
     },
     classCard: {
       height: '100%',
@@ -181,10 +190,10 @@ const StaffAttendance = () => {
             description={
               <div>
                 <Title level={4} style={{ color: '#3b1fa3', marginTop: 16 }}>
-                  No Classes Assigned
+                  No Classes Assigned for {currentYear}
                 </Title>
                 <Text type="secondary">
-                  You haven't been assigned to any classes yet. Please contact your admin.
+                  You haven't been assigned to any classes for {currentYear}. Please contact your admin.
                 </Text>
               </div>
             }
@@ -259,11 +268,11 @@ const StaffAttendance = () => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: 8,
-                        color: classColor,  // Changed from '#52c41a' to classColor
+                        color: classColor,
                         fontWeight: 600
                       }}
                     >
-                      <CheckSquareOutlined style={{ color: classColor }} />  {/* Changed from '#52c41a' to classColor */}
+                      <CheckSquareOutlined style={{ color: classColor }} />
                       <span>Record Attendance</span>
                     </div>
                   </div>
