@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Button, message, Typography, Card, Flex, Empty, Modal, Spin,
-  Tabs
+  Tabs, Pagination
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, EditOutlined, DownloadOutlined,
@@ -23,6 +23,9 @@ const StaffMaterials = () => {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('materials');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
   const navigate = useNavigate();
   const { classId } = useParams();
   const location = useLocation();
@@ -38,6 +41,7 @@ const StaffMaterials = () => {
       );
       if (res.data.success) {
         setMaterials(res.data.data);
+        setCurrentPage(1); // Reset to first page when new data loads
       }
     } catch (error) {
       console.error('Fetch error:', error);
@@ -92,6 +96,50 @@ const StaffMaterials = () => {
     } else {
       window.open(`http://localhost:8000${material.fileUrl}`, '_blank');
     }
+  };
+
+  // Get current page materials (flattened list for pagination)
+  const getCurrentPageMaterials = () => {
+    // First flatten all materials from all date groups
+    const allMaterials = [];
+    materials.forEach(dateGroup => {
+      dateGroup.items.forEach(material => {
+        allMaterials.push({
+          ...material,
+          date: dateGroup.date
+        });
+      });
+    });
+    
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return allMaterials.slice(startIndex, endIndex);
+  };
+
+  // Get total count of all materials
+  const getTotalMaterialsCount = () => {
+    let total = 0;
+    materials.forEach(dateGroup => {
+      total += dateGroup.items.length;
+    });
+    return total;
+  };
+
+  // Regroup paginated materials by date for display
+  const regroupMaterialsByDate = (paginatedMaterials) => {
+    const grouped = {};
+    paginatedMaterials.forEach(material => {
+      if (!grouped[material.date]) {
+        grouped[material.date] = [];
+      }
+      grouped[material.date].push(material);
+    });
+    
+    // Convert to array format
+    return Object.keys(grouped).map(date => ({
+      date: date,
+      items: grouped[date]
+    }));
   };
 
   const styles = {
@@ -244,79 +292,104 @@ const StaffMaterials = () => {
               />
             </Card>
           ) : (
-            materials.map((dateGroup, idx) => (
-              <div key={idx} style={styles.dateSection}>
-                <div style={styles.dateHeader}>
-                  <span style={{ 
-                    backgroundColor: classColor,
-                    color: 'white',
-                    padding: '2px 12px',
-                    borderRadius: 16,
-                    fontSize: 12,
-                    fontWeight: 600
-                  }}>
-                    {dateGroup.date}
-                  </span>
-                </div>
-                {dateGroup.items.map((material) => (
-                  <div 
-                    key={material.materialId} 
-                    style={styles.materialItem}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = `0 6px 16px ${classColor}40`;
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.borderColor = classColor;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = 'none';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.borderColor = `${classColor}30`;
-                    }}
-                  >
-                    <Flex align="center" gap={12} style={{ flex: 1 }}>
-                      {getFileIcon(material.fileType)}
-                      <div>
-                        <div style={styles.materialTitle}>
-                          {material.title}
-                        </div>
-                        {material.description && (
-                          <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
-                            {material.description}
-                          </div>
-                        )}
-                      </div>
-                    </Flex>
-                    <Flex gap={8}>
-                      <Button
-                        size="small"
-                        type="primary"
-                        icon={material.fileType === 'link' ? <LinkOutlined /> : <DownloadOutlined />}
-                        onClick={() => handleDownload(material)}
-                        style={{ background: '#1890ff', borderColor: '#1890ff' }}
-                      >
-                        {material.fileType === 'link' ? 'Open' : 'Open'}
-                      </Button>
-                      <Button
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={() => navigate(`/staff/materials/edit/${material.materialId}`, {
-                          state: { 
-                            classInfo: classInfo,
-                            classColor: classColor
-                          }
-                        })}
-                      />
-                      <Button
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => handleDelete(material.materialId)}
-                      />
-                    </Flex>
+            <>
+              {regroupMaterialsByDate(getCurrentPageMaterials()).map((dateGroup, idx) => (
+                <div key={idx} style={styles.dateSection}>
+                  <div style={styles.dateHeader}>
+                    <span style={{ 
+                      backgroundColor: classColor,
+                      color: 'white',
+                      padding: '2px 12px',
+                      borderRadius: 16,
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}>
+                      {dateGroup.date}
+                    </span>
                   </div>
-                ))}
+                  {dateGroup.items.map((material) => (
+                    <div 
+                      key={material.materialId} 
+                      style={styles.materialItem}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.boxShadow = `0 6px 16px ${classColor}40`;
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.borderColor = classColor;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.boxShadow = 'none';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.borderColor = `${classColor}30`;
+                      }}
+                    >
+                      <Flex align="center" gap={12} style={{ flex: 1 }}>
+                        {getFileIcon(material.fileType)}
+                        <div>
+                          <div style={styles.materialTitle}>
+                            {material.title}
+                          </div>
+                          {material.description && (
+                            <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                              {material.description}
+                            </div>
+                          )}
+                        </div>
+                      </Flex>
+                      <Flex gap={8}>
+                        <Button
+                          size="small"
+                          type="primary"
+                          icon={material.fileType === 'link' ? <LinkOutlined /> : <DownloadOutlined />}
+                          onClick={() => handleDownload(material)}
+                          style={{ background: '#1890ff', borderColor: '#1890ff' }}
+                        >
+                          {material.fileType === 'link' ? 'Open' : 'Open'}
+                        </Button>
+                        <Button
+                          size="small"
+                          icon={<EditOutlined />}
+                          onClick={() => navigate(`/staff/materials/edit/${material.materialId}`, {
+                            state: { 
+                              classInfo: classInfo,
+                              classColor: classColor
+                            }
+                          })}
+                        />
+                        <Button
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() => handleDelete(material.materialId)}
+                        />
+                      </Flex>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              
+              {/* Pagination Component */}
+              <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+                <Pagination
+                  current={currentPage}
+                  pageSize={pageSize}
+                  total={getTotalMaterialsCount()}
+                  showSizeChanger={true}
+                  showTotal={(total) => `Total ${total} materials`}
+                  pageSizeOptions={['10', '20', '50', '100']}
+                  onChange={(page, newPageSize) => {
+                    setCurrentPage(page);
+                    if (newPageSize !== pageSize) {
+                      setPageSize(newPageSize);
+                      setCurrentPage(1);
+                    }
+                  }}
+                  onShowSizeChange={(current, size) => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                />
               </div>
-            ))
+            </>
           )}
         </TabPane>
 

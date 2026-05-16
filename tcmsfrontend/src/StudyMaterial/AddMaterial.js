@@ -11,6 +11,26 @@ const { Title } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
 
+const ALLOWED_TYPES = {
+  pdf:   { mimes: ['application/pdf'], exts: ['.pdf'], label: 'PDF (.pdf)' },
+  image: { mimes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'], exts: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'], label: 'Image (.jpg, .jpeg, .png, .gif, .webp, .svg)' },
+  video: { mimes: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-msvideo'], exts: ['.mp4', '.webm', '.ogg', '.mov', '.avi'], label: 'Video (.mp4, .webm, .ogg, .mov, .avi)' },
+  zip:   { mimes: ['application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed'], exts: ['.zip', '.rar', '.7z'], label: 'Archive (.zip, .rar, .7z)' },
+};
+
+const validateFileType = (file, selectedType) => {
+  const allowed = ALLOWED_TYPES[selectedType];
+  if (!allowed) return true;
+  const ext = '.' + file.name.split('.').pop().toLowerCase();
+  const mimeOk = allowed.mimes.includes(file.type);
+  const extOk  = allowed.exts.includes(ext);
+  if (!mimeOk && !extOk) {
+    message.error(`Invalid file type. For "${selectedType}" please upload: ${allowed.label}`);
+    return false;
+  }
+  return true;
+};
+
 const AddMaterial = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -22,7 +42,6 @@ const AddMaterial = () => {
   const location = useLocation();
   const user = getUser();
   
-  // Get the preselected class ID from navigation state
   const preselectedClassId = location.state?.preselectedClassId;
   const classInfo = location.state?.classInfo;
   const classColor = location.state?.classColor;
@@ -60,6 +79,7 @@ const AddMaterial = () => {
     formData.append('fileType', fileType);
     formData.append('classId', preselectedClassId);
     formData.append('authorityId', user.id);
+    // Academic year will be set automatically on the backend
 
     if (fileType === 'link') {
       formData.append('fileUrl', values.fileUrl);
@@ -81,18 +101,25 @@ const AddMaterial = () => {
 
       if (res.data.success) {
         message.success('Material uploaded successfully!');
-        // Navigate back to the class materials page with class info and color
-        // Use the original classInfo from props instead of finding it again
         navigate(`/staff/materials/class/${preselectedClassId}`, {
           state: { 
-            classInfo: classInfo, // Use the original classInfo from props
+            classInfo: classInfo,
             classColor: classColor
           }
         });
       }
     } catch (err) {
       console.error('Upload error:', err);
-      message.error(err.response?.data?.message || 'Failed to upload material');
+      if (err.response?.data?.errors) {
+        const errors = err.response.data.errors;
+        const firstErrorKey = Object.keys(errors)[0];
+        const firstError = errors[firstErrorKey][0];
+        message.error(`Validation error: ${firstError}`);
+      } else if (err.response?.data?.message) {
+        message.error(err.response.data.message);
+      } else {
+        message.error('Failed to upload material');
+      }
     } finally {
       setLoading(false);
     }
@@ -130,7 +157,7 @@ const AddMaterial = () => {
             if (preselectedClassId) {
               navigate(`/staff/materials/class/${preselectedClassId}`, {
                 state: { 
-                  classInfo: classInfo, // Use the original classInfo from props
+                  classInfo: classInfo,
                   classColor: classColor
                 }
               });
@@ -192,7 +219,7 @@ const AddMaterial = () => {
                     name="fileType"
                     rules={[{ required: true }]}
                   >
-                    <Select onChange={setFileType}>
+                    <Select onChange={(val) => { setFileType(val); setFileList([]); }}>
                       <Option value="pdf">PDF Document</Option>
                       <Option value="image">Image</Option>
                       <Option value="video">Video</Option>
@@ -211,17 +238,24 @@ const AddMaterial = () => {
                     >
                       <Upload
                         beforeUpload={(file) => {
-                          setFileList([file]);
+                          const valid = validateFileType(file, fileType);
+                          if (valid) setFileList([file]);
                           return false;
                         }}
                         onRemove={() => setFileList([])}
                         fileList={fileList.map(f => ({ name: f.name, uid: f.uid }))}
                         maxCount={1}
+                        accept={ALLOWED_TYPES[fileType]?.exts.join(',')}
                       >
                         <Button icon={<UploadOutlined />} size="large">
                           Select File (Max 50MB)
                         </Button>
                       </Upload>
+                      {ALLOWED_TYPES[fileType] && (
+                        <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
+                          Accepted: {ALLOWED_TYPES[fileType].label}
+                        </Typography.Text>
+                      )}
                     </Form.Item>
                   ) : (
                     <Form.Item

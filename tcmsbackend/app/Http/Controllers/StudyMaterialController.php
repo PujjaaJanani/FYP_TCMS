@@ -19,13 +19,15 @@ class StudyMaterialController extends Controller
         try {
             $user = $request->user();
             $studentId = $user->getKey();
-            
+            $currentYear = date('Y');
+
             Log::info('Fetching classes for student: ' . $studentId);
 
-            // Get all approved registrations for this student
+            // Get all approved registrations for this student in current year
             $registrations = DB::table('registration')
                 ->where('studentId', $studentId)
                 ->where('status', 'Approved')
+                ->where('enrollmentYear', $currentYear)
                 ->get();
 
             if ($registrations->isEmpty()) {
@@ -40,7 +42,7 @@ class StudyMaterialController extends Controller
             foreach ($registrations as $reg) {
                 // Add classId if exists
                 if (!empty($reg->classId)) {
-                    $classIds[] = (int)$reg->classId;
+                    $classIds[] = (int) $reg->classId;
                 }
                 // Add classIds if exists (comma-separated)
                 if (!empty($reg->classIds)) {
@@ -63,6 +65,7 @@ class StudyMaterialController extends Controller
                 ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                 ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
                 ->whereIn('class.classId', $classIds)
+                ->where('class.academicYear', $currentYear)
                 ->select(
                     'class.classId',
                     'class.classDay',
@@ -107,13 +110,15 @@ class StudyMaterialController extends Controller
         try {
             $user = $request->user(); // Get authenticated user
             $authorityId = $user->getKey(); // Get user ID
-            
+            $currentYear = date('Y');
+
             Log::info('Fetching classes for authority: ' . $authorityId);
 
             $classes = DB::table('class')
                 ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                 ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
                 ->where('class.authorityId', $authorityId)
+                ->where('class.academicYear', $currentYear)
                 ->select(
                     'class.classId',
                     'class.classDay',
@@ -151,21 +156,27 @@ class StudyMaterialController extends Controller
 
     /**
      * GET /api/study-materials/class/{classId}
-     * Get all materials for a specific class
+     * Get all materials for a specific class (optionally filter by academic year)
      */
-    public function getClassMaterials($classId)
+    public function getClassMaterials($classId, Request $request)
     {
         try {
-            $materials = DB::table('studymaterial')
+            $query = DB::table('studymaterial')
                 ->leftJoin('authority', 'studymaterial.authorityId', '=', 'authority.authorityId')
-                ->where('studymaterial.classId', $classId)
-                ->select(
-                    'studymaterial.*',
-                    'authority.name as uploadedBy'
-                )
+                ->where('studymaterial.classId', $classId);
+
+            // Optional academic year filter
+            if ($request->has('academicYear') && !empty($request->academicYear)) {
+                $query->where('studymaterial.academicYear', $request->academicYear);
+            }
+
+            $materials = $query->select(
+                'studymaterial.*',
+                'authority.name as uploadedBy'
+            )
                 ->orderBy('studymaterial.uploadedAt', 'desc')
                 ->get()
-                ->groupBy(function($item) {
+                ->groupBy(function ($item) {
                     return date('n/j/Y', strtotime($item->uploadedAt));
                 });
 
@@ -194,12 +205,12 @@ class StudyMaterialController extends Controller
 
     /**
      * GET /api/study-materials
-     * Get all study materials grouped by subject/date
+     * Get all study materials grouped by subject/date (optionally filter by academic year)
      */
-    public function getAllMaterials()
+    public function getAllMaterials(Request $request)
     {
         try {
-            $materials = DB::table('studymaterial')
+            $query = DB::table('studymaterial')
                 ->join('class', 'studymaterial.classId', '=', 'class.classId')
                 ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                 ->leftJoin('authority', 'studymaterial.authorityId', '=', 'authority.authorityId')
@@ -208,10 +219,16 @@ class StudyMaterialController extends Controller
                     'subject.name as subjectName',
                     'subject.form',
                     'authority.name as uploadedBy'
-                )
-                ->orderBy('studymaterial.uploadedAt', 'desc')
+                );
+
+            // Optional academic year filter
+            if ($request->has('academicYear') && !empty($request->academicYear)) {
+                $query->where('studymaterial.academicYear', $request->academicYear);
+            }
+
+            $materials = $query->orderBy('studymaterial.uploadedAt', 'desc')
                 ->get()
-                ->groupBy(function($item) {
+                ->groupBy(function ($item) {
                     return $item->subjectName; // Group by subject
                 });
 
@@ -220,9 +237,9 @@ class StudyMaterialController extends Controller
             foreach ($materials as $subject => $items) {
                 $result[] = [
                     'subject' => $subject,
-                    'materials' => $items->groupBy(function($item) {
+                    'materials' => $items->groupBy(function ($item) {
                         return date('n/j/Y', strtotime($item->uploadedAt)); // Group by date
-                    })->map(function($dateGroup, $date) {
+                    })->map(function ($dateGroup, $date) {
                         return [
                             'date' => $date,
                             'items' => $dateGroup
@@ -298,6 +315,7 @@ class StudyMaterialController extends Controller
             'fileType' => 'required|in:pdf,image,video,link,zip',
             'classId' => 'required|integer|exists:class,classId',
             'authorityId' => 'required|integer|exists:authority,authorityId',
+            // REMOVED academicYear from validation
             'file' => 'required_unless:fileType,link|file|max:51200', // Max 50MB
             'fileUrl' => 'required_if:fileType,link|url'
         ]);
@@ -317,21 +335,21 @@ class StudyMaterialController extends Controller
             if ($request->fileType !== 'link' && $request->hasFile('file')) {
                 $file = $request->file('file');
                 $fileName = time() . '_' . $file->getClientOriginalName();
-                
+
                 // Define the public materials directory path
                 $materialsPath = public_path('materials');
-                
+
                 // Create the directory if it doesn't exist
                 if (!File::exists($materialsPath)) {
                     File::makeDirectory($materialsPath, 0755, true);
                 }
-                
+
                 // Move the file to public/materials directory
                 $file->move($materialsPath, $fileName);
-                
+
                 // Set the URL path to /materials/filename
                 $fileUrl = '/materials/' . $fileName;
-                
+
                 Log::info('File uploaded to public/materials', [
                     'original_name' => $file->getClientOriginalName(),
                     'saved_as' => $fileName,
@@ -343,6 +361,9 @@ class StudyMaterialController extends Controller
                 $fileName = null;
             }
 
+            // Set academic year to current year automatically
+            $currentYear = date('Y');
+            
             $materialId = DB::table('studymaterial')->insertGetId([
                 'title' => $request->title,
                 'description' => $request->description,
@@ -351,12 +372,14 @@ class StudyMaterialController extends Controller
                 'fileName' => $fileName,
                 'authorityId' => $request->authorityId,
                 'classId' => $request->classId,
+                'academicYear' => $currentYear, // Automatically set to current year
                 'uploadedAt' => now()
             ]);
 
             Log::info('Material created', [
                 'materialId' => $materialId,
-                'fileUrl' => $fileUrl
+                'fileUrl' => $fileUrl,
+                'academicYear' => $currentYear
             ]);
 
             return response()->json([
@@ -410,7 +433,8 @@ class StudyMaterialController extends Controller
                 'title' => $request->title,
                 'description' => $request->description,
                 'fileType' => $request->fileType,
-                'classId' => $request->classId
+                'classId' => $request->classId,
+                'academicYear' => $material->academicYear
             ];
 
             // Handle new file upload
@@ -426,22 +450,22 @@ class StudyMaterialController extends Controller
 
                 $file = $request->file('file');
                 $fileName = time() . '_' . $file->getClientOriginalName();
-                
+
                 // Define the public materials directory path
                 $materialsPath = public_path('materials');
-                
+
                 // Create the directory if it doesn't exist
                 if (!File::exists($materialsPath)) {
                     File::makeDirectory($materialsPath, 0755, true);
                 }
-                
+
                 // Move the file to public/materials directory
                 $file->move($materialsPath, $fileName);
-                
+
                 // Set the URL path to /materials/filename
                 $updateData['fileUrl'] = '/materials/' . $fileName;
                 $updateData['fileName'] = $fileName;
-                
+
                 Log::info('New file uploaded to public/materials', [
                     'saved_as' => $fileName,
                     'url' => $updateData['fileUrl']
@@ -456,7 +480,10 @@ class StudyMaterialController extends Controller
                 ->where('materialId', $materialId)
                 ->update($updateData);
 
-            Log::info('Material updated', ['materialId' => $materialId]);
+            Log::info('Material updated', [
+                'materialId' => $materialId,
+                'academicYear' => $material->academicYear
+            ]);
 
             return response()->json([
                 'success' => true,
