@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Select, message, Steps, Card, Space } from 'antd';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import Header from '../Layout/Header';
 import './Register.css';
 
 const { Option } = Select;
@@ -15,6 +16,7 @@ const Register = () => {
   const [selectedClasses, setSelectedClasses] = useState([]);
   const [tempSubject, setTempSubject] = useState(null);
   const [tempClass, setTempClass] = useState(null);
+  const [classesStatus, setClassesStatus] = useState(null); // null | 'none' | 'all_full' | 'available'
   const [form] = Form.useForm();
   const navigate = useNavigate();
 
@@ -34,10 +36,25 @@ const Register = () => {
   };
 
   const fetchClassesBySubject = async (subjectId) => {
+    setClassesStatus(null);
     try {
       const response = await axios.get(`http://localhost:8000/api/classes/by-subject/${subjectId}`);
       if (response.data.success) {
-        setAvailableClasses(response.data.data);
+        const all = response.data.data;
+        if (all.length === 0) {
+          setAvailableClasses([]);
+          setClassesStatus('none');
+          return;
+        }
+        // Filter out classes where availableSpaces is 0 (full)
+        const withSpaces = all.filter(cls => cls.availableSpaces > 0);
+        if (withSpaces.length === 0) {
+          setAvailableClasses([]);
+          setClassesStatus('all_full');
+        } else {
+          setAvailableClasses(withSpaces);
+          setClassesStatus('available');
+        }
       }
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -48,6 +65,7 @@ const Register = () => {
   const handleSubjectChange = (subjectId) => {
     setTempSubject(subjectId);
     setTempClass(null);
+    setClassesStatus(null);
     fetchClassesBySubject(subjectId);
   };
 
@@ -112,7 +130,7 @@ const Register = () => {
   const getCurrentStepFields = () => {
     const stepFields = [
       ['name', 'email', 'password', 'confirmPassword'],
-      ['phone', 'address'],
+      ['phone', 'parentEmail', 'parentPassword', 'address'],
       []
     ];
     return stepFields[currentStep];
@@ -136,6 +154,8 @@ const Register = () => {
         email: values.email,
         password: values.password,
         phone: values.phone,
+        parentEmail: values.parentEmail,
+        parentPassword: values.parentPassword,
         address: values.address,
         classes: selectedClasses.map(c => c.classId)
       };
@@ -189,22 +209,7 @@ const Register = () => {
 
   return (
     <div className="register-container">
-      <nav className="navbar">
-        <div className="navbar-brand">Hari's Tuition Center</div>
-        <div className="navbar-menu">
-          <Link to="/">HOME</Link>
-          <Link to="/student/schedule">CLASS SCHEDULE</Link>
-          <Link to="/about">ABOUT US</Link>
-          <Link to="/contact">CONTACT</Link>
-          <Button 
-            type="primary" 
-            className="login-nav-btn"
-            onClick={() => navigate('/login')}
-          >
-            LOGIN
-          </Button>
-        </div>
-      </nav>
+      <Header />
 
       <div className="register-content">
         <div className="register-box" style={{ maxWidth: 650 }}>
@@ -221,7 +226,18 @@ const Register = () => {
               <Form.Item label="Email" name="email" rules={[{ required: true, message: 'Please enter your email!' }, { type: 'email' }]}>
                 <Input size="large" placeholder="Enter your email" />
               </Form.Item>
-              <Form.Item label="Password" name="password" rules={[{ required: true }, { min: 6 }]}>
+              <Form.Item label="Password" name="password" rules={[
+                { required: true, message: 'Please enter your password!' },
+                { min: 6, message: 'Password must be at least 6 characters!' },
+                {
+                  validator(_, value) {
+                    if (!value) return Promise.resolve();
+                    if (!/\d/.test(value)) return Promise.reject(new Error('Password must contain at least one number!'));
+                    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(value)) return Promise.reject(new Error('Password must contain at least one symbol!'));
+                    return Promise.resolve();
+                  }
+                }
+              ]}>
                 <Input.Password size="large" placeholder="Enter your password" />
               </Form.Item>
               <Form.Item label="Confirm Password" name="confirmPassword" dependencies={['password']} rules={[{ required: true }, ({ getFieldValue }) => ({ validator(_, value) { if (!value || getFieldValue('password') === value) return Promise.resolve(); return Promise.reject(new Error('Passwords do not match!')); }})]}>
@@ -232,6 +248,35 @@ const Register = () => {
             <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
               <Form.Item label="Phone Number" name="phone" rules={[{ required: true }]}>
                 <Input size="large" placeholder="Enter your phone number" />
+              </Form.Item>
+              <Form.Item
+                label="Parent Email"
+                name="parentEmail"
+                extra="Use the same email if you have 2 or more children registered in the tuition center."
+                rules={[
+                  { required: true, message: 'Please enter parent email!' },
+                  { type: 'email', message: 'Please enter a valid parent email!' }
+                ]}
+              >
+                <Input size="large" placeholder="Enter parent email" />
+              </Form.Item>
+              <Form.Item
+                label="Parent Password"
+                name="parentPassword"
+                rules={[
+                  { required: true, message: 'Please enter parent password!' },
+                  { min: 6, message: 'Parent password must be at least 6 characters!' },
+                  {
+                    validator(_, value) {
+                      if (!value) return Promise.resolve();
+                      if (!/\d/.test(value)) return Promise.reject(new Error('Parent password must contain at least one number!'));
+                      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(value)) return Promise.reject(new Error('Parent password must contain at least one symbol!'));
+                      return Promise.resolve();
+                    }
+                  }
+                ]}
+              >
+                <Input.Password size="large" placeholder="Enter parent password" />
               </Form.Item>
               <Form.Item label="Address" name="address" rules={[{ required: true }]}>
                 <Input.TextArea size="large" rows={4} placeholder="Enter your full address" />
@@ -246,15 +291,26 @@ const Register = () => {
                       <Option key={subject.subjectId} value={subject.subjectId}>{subject.name} - {subject.form}</Option>
                     ))}
                   </Select>
-                  <Select size="large" placeholder="Select class schedule" value={tempClass} onChange={setTempClass} disabled={!tempSubject} style={{ width: '100%' }}>
+                  <Select size="large" placeholder="Select class schedule" value={tempClass} onChange={setTempClass} disabled={!tempSubject || classesStatus !== 'available'} style={{ width: '100%' }}>
                     {availableClasses.map(cls => (
                       <Option key={cls.classId} value={cls.classId}>
-                        {cls.classDay} - {cls.startTime} to {cls.finishTime} 
+                        {cls.classDay} - {cls.startTime} to {cls.finishTime}
                         {cls.location && ` at ${cls.location}`}
                         {cls.teacher && ` (${cls.teacher})`}
+                        {` — ${cls.availableSpaces} seat${cls.availableSpaces !== 1 ? 's' : ''} left`}
                       </Option>
                     ))}
                   </Select>
+                  {classesStatus === 'none' && (
+                    <div style={{ padding: '8px 12px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 6, color: '#ad6800', fontSize: 13 }}>
+                      ⚠️ No classes available for this subject yet.
+                    </div>
+                  )}
+                  {classesStatus === 'all_full' && (
+                    <div style={{ padding: '8px 12px', background: '#fff1f0', border: '1px solid #ffa39e', borderRadius: 6, color: '#cf1322', fontSize: 13 }}>
+                      🚫 All classes for this subject are currently full.
+                    </div>
+                  )}
                   <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddClass} block size="large">Add Class</Button>
                 </Space>
               </Card>
@@ -295,7 +351,7 @@ const Register = () => {
             </div>
           </Form>
 
-          <div className="register-footer">Already have an account? <Link to="/login">Login here</Link></div>
+          <div className="register-footer">Already have an account? <a href="/login">Login here</a></div>
         </div>
       </div>
     </div>

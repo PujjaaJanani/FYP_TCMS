@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from 'antd';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import Header from '../Layout/Header';
 import './LandingPage.css';
 
 const LandingPage = () => {
@@ -8,22 +9,7 @@ const LandingPage = () => {
 
   return (
     <div className="landing-container">
-      <nav className="navbar">
-        <div className="navbar-brand">Hari's Tuition Center</div>
-        <div className="navbar-menu">
-          <Link to="/">HOME</Link>
-          <Link to="/student/schedule">CLASS SCHEDULE</Link>
-          <Link to="/about">ABOUT US</Link>
-          <Link to="/contact">CONTACT</Link>
-          <Button 
-            type="primary" 
-            className="login-nav-btn"
-            onClick={() => navigate('/login')}
-          >
-            LOGIN
-          </Button>
-        </div>
-      </nav>
+      <Header />
 
       <div className="landing-hero">
         <div className="hero-content">

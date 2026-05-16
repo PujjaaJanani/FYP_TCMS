@@ -1,0 +1,117 @@
+/* Enrollment Container - Matching Landing Page Style */
+.enrollment-container {
+  min-height: 100vh;
+  background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+    url('https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=2070') center/cover no-repeat;
+  background-attachment: fixed;
+}
+
+.enrollment-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 64px);
+  padding: 40px 20px;
+}
+
+.enrollment-box {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 750px;
+  animation: fadeInUp 0.8s ease-out;
+}
+
+.enrollment-title {
+  text-align: center;
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #333;
+  letter-spacing: 1px;
+}
+
+.enrollment-subtitle {
+  text-align: center;
+  color: #666;
+  margin-bottom: 24px;
+  font-size: 16px;
+}
+
+.enrollment-button {
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  transition: all 0.3s ease;
+  border-radius: 6px;
+}
+
+.enrollment-button:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46a0 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.fee-summary {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e8f4f8 100%);
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: center;
+  border: 1px solid rgba(24, 144, 255, 0.2);
+}
+
+.fee-summary h3 {
+  margin: 0 0 8px 0;
+  color: #1890ff;
+  font-size: 18px;
+}
+
+.fee-summary p {
+  margin: 0;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.fee-summary p strong {
+  color: #1890ff;
+  font-size: 24px;
+}
+
+.fee-summary small {
+  color: #666;
+  display: block;
+  margin-top: 8px;
+}
+
+/* Animation for the form box */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .enrollment-box {
+    padding: 24px;
+    max-width: 95%;
+  }
+  
+  .enrollment-title {
+    font-size: 24px;
+  }
+  
+  .fee-summary p strong {
+    font-size: 20px;
+  }
+}

@@ -14,15 +14,58 @@ class RegistrationController extends Controller
      * Register a new student and create ONE registration with multiple classes
      * Uses classIds column for storing multiple class IDs
      */
+    /**
+     * Register a new student and create ONE registration with multiple classes
+     * Uses classIds column for storing multiple class IDs
+     */
     public function register(Request $request)
     {
         Log::info('Registration request received', $request->all());
+
+        // Check for existing student with the same email
+        $existingStudent = DB::table('student')
+            ->where('email', trim($request->email))
+            ->first();
+
+        if ($existingStudent) {
+            // Check if student has any approved or pending registrations
+            $activeRegistration = DB::table('registration')
+                ->where('studentId', $existingStudent->studentId)
+                ->whereIn('status', ['Approved', 'Pending'])
+                ->exists();
+
+            if ($activeRegistration) {
+                // Email is already in use with an active or pending registration
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => [
+                        'email' => ['This email is already registered with an active or pending application. Please use a different email address.']
+                    ]
+                ], 422);
+            }
+
+            // If only rejected registrations exist, delete the old student record and allow re-registration
+            // Delete associated registrations first (due to foreign key constraints)
+            DB::table('registration')
+                ->where('studentId', $existingStudent->studentId)
+                ->delete();
+
+            // Delete the student record
+            DB::table('student')
+                ->where('studentId', $existingStudent->studentId)
+                ->delete();
+
+            Log::info('Deleted rejected student record to allow re-registration', ['studentId' => $existingStudent->studentId, 'email' => $existingStudent->email]);
+        }
 
         // Validate the request
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'email' => 'required|email|max:100|unique:student,email',
-            'password' => 'required|string|min:6',
+            'parentEmail' => 'required|email|max:100',
+            'parentPassword' => ['required', 'string', 'min:6', 'regex:/[0-9]/', 'regex:/[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?`~]/'],
+            'password' => ['required', 'string', 'min:6', 'regex:/[0-9]/', 'regex:/[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?`~]/'],
             'phone' => 'required|string|max:20',
             'address' => 'required|string|max:255',
             'classes' => 'required|array|min:1',
@@ -39,6 +82,9 @@ class RegistrationController extends Controller
 
         try {
             DB::beginTransaction();
+
+            // Get current academic year
+            $currentYear = date('Y');
 
             // Get the default authority (admin)
             $defaultAuthority = DB::table('authority')
@@ -57,6 +103,8 @@ class RegistrationController extends Controller
             $studentId = DB::table('student')->insertGetId([
                 'name' => trim($request->name),
                 'email' => trim($request->email),
+                'parentEmail' => trim($request->parentEmail),
+                'parentPassword' => Hash::make($request->parentPassword),
                 'password' => Hash::make($request->password),
                 'phone' => trim($request->phone),
                 'address' => trim($request->address)
@@ -70,14 +118,15 @@ class RegistrationController extends Controller
 
             // Calculate total monthly fee based on subject fees
             $totalMonthlyFee = $this->calculateTotalMonthlyFee($request->classes);
-            
+
             $registrationId = DB::table('registration')->insertGetId([
                 'createdAt' => now(),
                 'status' => 'Pending',
-                'studentId' => (int)$studentId,
-                'classId' => (int)$firstClassId,  // Foreign key - first class
-                'classIds' => $classIds,          // All classes as "1,2,3"
-                'monthlyFee' => $totalMonthlyFee, // Calculated total fee
+                'studentId' => (int) $studentId,
+                'classId' => (int) $firstClassId,     // Foreign key - first class
+                'classIds' => $classIds,              // All classes as "1,2,3"
+                'enrollmentYear' => $currentYear,    // ADD THIS LINE - Current academic year
+                'monthlyFee' => $totalMonthlyFee,     // Calculated total fee
             ]);
 
             Log::info('Registration created', [
@@ -85,6 +134,7 @@ class RegistrationController extends Controller
                 'registrationId' => $registrationId,
                 'classIds' => $classIds,
                 'classCount' => count($request->classes),
+                'enrollmentYear' => $currentYear,
                 'monthlyFee' => $totalMonthlyFee
             ]);
 
@@ -92,12 +142,13 @@ class RegistrationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registration successful. Please wait for admin approval.',
+                'message' => 'Registration successful! Please wait for admin approval.',
                 'data' => [
                     'studentId' => $studentId,
                     'registrationId' => $registrationId,
                     'classIds' => $request->classes,
                     'classCount' => count($request->classes),
+                    'enrollmentYear' => $currentYear,
                     'monthlyFee' => $totalMonthlyFee,
                     'status' => 'Pending'
                 ]
@@ -105,12 +156,12 @@ class RegistrationController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error('Registration failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Registration failed: ' . $e->getMessage()
@@ -153,19 +204,28 @@ class RegistrationController extends Controller
     }
 
     /**
-     * Get all subjects
+     * Get all subjects (that have classes for current year)
      */
     public function getSubjects()
     {
         try {
+            $currentYear = date('Y');
+
             $subjects = DB::table('subject')
+                ->whereExists(function ($query) use ($currentYear) {
+                    $query->select(DB::raw(1))
+                        ->from('class')
+                        ->whereColumn('class.subjectId', 'subject.subjectId')
+                        ->where('class.academicYear', $currentYear);
+                })
                 ->select('subjectId', 'name', 'form', 'subjectFee')
                 ->get();
 
             return response()->json([
                 'success' => true,
-                'data' => $subjects
-            ], 200);
+                'data' => $subjects,
+                'academic_year' => $currentYear
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -181,29 +241,49 @@ class RegistrationController extends Controller
     public function getClassesBySubject($subjectId)
     {
         try {
+            $currentYear = date('Y');
+
             $classes = DB::table('class')
                 ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
                 ->where('class.subjectId', $subjectId)
+                ->where('class.academicYear', $currentYear)
                 ->select(
                     'class.classId',
                     'class.classDay',
                     'class.startTime',
                     'class.finishTime',
                     'class.location',
+                    'class.availability',
                     'authority.name as teacher'
                 )
                 ->get();
 
-            $classes = $classes->map(function ($class) {
+            $classes = $classes->map(function ($class) use ($currentYear) {
                 $class->startTime = date('H:i', strtotime($class->startTime));
                 $class->finishTime = date('H:i', strtotime($class->finishTime));
+
+                // Count approved enrolled students for current year only
+                $enrolledCount = DB::table('registration')
+                    ->where('status', 'Approved')
+                    ->where('enrollmentYear', $currentYear)
+                    ->where(function ($query) use ($class) {
+                        $query->where('classId', $class->classId)
+                            ->orWhereRaw('FIND_IN_SET(?, classIds)', [$class->classId]);
+                    })
+                    ->distinct()
+                    ->count('studentId');
+
+                $class->enrolledStudents = $enrolledCount;
+                $class->availableSpaces = max(0, $class->availability - $enrolledCount);
+
                 return $class;
             });
 
             return response()->json([
                 'success' => true,
-                'data' => $classes
-            ], 200);
+                'data' => $classes,
+                'academic_year' => $currentYear
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -219,9 +299,12 @@ class RegistrationController extends Controller
     public function getAllClasses()
     {
         try {
+            $currentYear = date('Y');
+
             $classes = DB::table('class')
                 ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                 ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
+                ->where('class.academicYear', $currentYear)
                 ->select(
                     'class.classId',
                     'class.classDay',
@@ -235,7 +318,7 @@ class RegistrationController extends Controller
                 )
                 ->get();
 
-            $classes = $classes->map(function ($class) {
+            $classes = $classes->map(function ($class) use ($currentYear) {
                 $class->startTime = date('H:i', strtotime($class->startTime));
                 $class->finishTime = date('H:i', strtotime($class->finishTime));
                 return $class;
@@ -243,8 +326,9 @@ class RegistrationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $classes
-            ], 200);
+                'data' => $classes,
+                'academic_year' => $currentYear
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -286,7 +370,7 @@ class RegistrationController extends Controller
             $parsedRegistrations = [];
             foreach ($registrations as $registration) {
                 $classIdArray = explode(',', $registration->classIds);
-                
+
                 // Get details for all classes in this registration
                 $classes = DB::table('class')
                     ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
