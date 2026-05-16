@@ -34,6 +34,8 @@ const StudentTestMarks = () => {
   const fetchTests = async () => {
     setLoading(true);
     try {
+      const currentYear = new Date().getFullYear();
+
       // First get the student's registration for this class
       const studentRes = await axios.get(
         `http://localhost:8000/api/testmarks/class/${classId}/students`,
@@ -55,7 +57,7 @@ const StudentTestMarks = () => {
 
       // Get all tests for this class
       const testsRes = await axios.get(
-        `http://localhost:8000/api/testmarks/class/${classId}`,
+        `http://localhost:8000/api/testmarks/class/${classId}?academicYear=${currentYear}`,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 

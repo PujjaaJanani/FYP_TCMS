@@ -13,15 +13,20 @@ use Illuminate\Support\Facades\Validator;
 class TestMarkController extends Controller
 {
     /**
-     * Get all tests for a specific class
+     * Get all tests for a specific class (optionally filter by academic year)
      */
-    public function getClassTests($classId)
+    public function getClassTests($classId, Request $request)
     {
         try {
-            // Get all unique tests for this class
-            $tests = TestMark::select('testName', 'testDate')
-                ->where('classId', $classId)
-                ->distinct()
+            $query = TestMark::select('testName', 'testDate', 'academicYear')
+                ->where('classId', $classId);
+            
+            // Optional academic year filter
+            if ($request->has('academicYear') && !empty($request->academicYear)) {
+                $query->where('academicYear', $request->academicYear);
+            }
+            
+            $tests = $query->distinct()
                 ->orderBy('testDate', 'desc')
                 ->get();
 
@@ -29,10 +34,16 @@ class TestMarkController extends Controller
             
             foreach ($tests as $test) {
                 // Get all marks for this specific test
-                $marks = TestMark::where('testmark.classId', $classId)
+                $marksQuery = TestMark::where('testmark.classId', $classId)
                     ->where('testName', $test->testName)
-                    ->where('testDate', $test->testDate)
-                    ->join('registration', function($join) use ($classId) {
+                    ->where('testDate', $test->testDate);
+                
+                // Apply academic year filter to marks as well
+                if ($request->has('academicYear') && !empty($request->academicYear)) {
+                    $marksQuery->where('testmark.academicYear', $request->academicYear);
+                }
+                
+                $marks = $marksQuery->join('registration', function($join) use ($classId) {
                         $join->on('testmark.registrationId', '=', 'registration.registrationId')
                             ->where(function($query) use ($classId) {
                                 $query->where('registration.classId', $classId)
@@ -50,6 +61,7 @@ class TestMarkController extends Controller
                 $result[] = [
                     'testName' => $test->testName,
                     'testDate' => date('Y-m-d', strtotime($test->testDate)),
+                    'academicYear' => $test->academicYear,
                     'marks' => $marks->map(function($mark) {
                         return [
                             'markId' => $mark->markId,
@@ -82,13 +94,17 @@ class TestMarkController extends Controller
     public function getClassStudents($classId)
     {
         try {
+            $currentYear = date('Y');
+
             // First get all approved registrations
             $registrations = Registration::where('status', 'Approved')
+                ->where('enrollmentYear', $currentYear)
                 ->join('student', 'registration.studentId', '=', 'student.studentId')
                 ->select(
                     'registration.registrationId',
                     'registration.classId',
                     'registration.classIds',
+                    'registration.enrollmentYear',
                     'student.studentId',
                     'student.name as studentName'
                 )
@@ -160,13 +176,17 @@ class TestMarkController extends Controller
         try {
             DB::beginTransaction();
 
+            // Set academic year to current year automatically
+            $currentYear = date('Y');
+
             foreach ($request->marks as $markData) {
                 TestMark::create([
                     'testName' => $request->testName,
                     'testDate' => $request->testDate,
                     'classId' => $request->classId,
                     'registrationId' => $markData['registrationId'],
-                    'mark' => $markData['mark']
+                    'mark' => $markData['mark'],
+                    'academicYear' => $currentYear // Automatically set to current year
                 ]);
             }
 
@@ -215,6 +235,22 @@ class TestMarkController extends Controller
             $originalTestName = urldecode($testName);
             $originalTestDate = urldecode($testDate);
 
+            // Get the existing test to preserve academic year
+            $existingTest = TestMark::where('classId', $classId)
+                ->where('testName', $originalTestName)
+                ->where('testDate', $originalTestDate)
+                ->first();
+
+            if (!$existingTest && !empty($request->marks)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Test not found'
+                ], 404);
+            }
+
+            // Keep the original academic year
+            $academicYear = $existingTest ? $existingTest->academicYear : date('Y');
+
             // Delete all existing marks for this test
             $deleted = TestMark::where('classId', $classId)
                 ->where('testName', $originalTestName)
@@ -228,14 +264,15 @@ class TestMarkController extends Controller
                 ], 404);
             }
 
-            // Insert new marks
+            // Insert new marks with preserved academic year
             foreach ($request->marks as $markData) {
                 TestMark::create([
                     'testName' => $request->testName,
                     'testDate' => $request->testDate,
                     'classId' => $request->classId,
                     'registrationId' => $markData['registrationId'],
-                    'mark' => $markData['mark']
+                    'mark' => $markData['mark'],
+                    'academicYear' => $academicYear // Preserve original academic year
                 ]);
             }
 
@@ -328,6 +365,7 @@ class TestMarkController extends Controller
                     'testName' => $mark->testName,
                     'testDate' => $mark->testDate,
                     'classId' => $mark->classId,
+                    'academicYear' => $mark->academicYear,
                     'marks' => $allMarks
                 ]
             ]);
