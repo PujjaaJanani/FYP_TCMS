@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use App\Services\SMSService;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -12,6 +13,17 @@ use Illuminate\Support\Facades\Http;
 
 class PaymentController extends Controller
 {
+    private function getParentRegistrationsForYear($parentEmail, $year)
+    {
+        return DB::table('registration')
+            ->join('student', 'registration.studentId', '=', 'student.studentId')
+            ->where('student.parentEmail', $parentEmail)
+            ->where('registration.status', 'Approved')
+            ->where('registration.enrollmentYear', $year)
+            ->select('registration.registrationId', 'registration.monthlyFee')
+            ->get();
+    }
+
     /**
      * Get payment history for a student (current year)
      */
@@ -19,28 +31,57 @@ class PaymentController extends Controller
     {
         try {
             $user = $request->user();
-            $studentId = $user->getKey();
-            
             $year = $request->query('year', date('Y'));
-            
-            $registration = DB::table('registration')
-                ->where('studentId', $studentId)
-                ->where('status', 'Approved')
-                ->first();
-            
-            if (!$registration) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No approved registration found'
-                ], 404);
+
+            $isParent = $request->user()->tokenCan('parent');
+            $monthlyFee = 0;
+            $payments = collect();
+
+            if ($isParent) {
+                $parentEmail = $user->parentEmail;
+                $registrations = $this->getParentRegistrationsForYear($parentEmail, $year);
+
+                if ($registrations->isEmpty()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No linked children with approved registration found for ' . $year
+                    ], 404);
+                }
+
+                $registrationIds = $registrations->pluck('registrationId')->toArray();
+                $monthlyFee = (float) $registrations->sum(function ($r) {
+                    return floatval($r->monthlyFee ?? 0);
+                });
+
+                // Parent payments are anchored to one linked registration and marked with parentEmail in remark
+                $payments = Payment::whereIn('registrationId', $registrationIds)
+                    ->where('paymentStatus', 'Paid')
+                    ->get()
+                    ->filter(function ($payment) use ($parentEmail) {
+                        $remark = json_decode($payment->remark, true);
+                        return isset($remark['parentEmail']) && $remark['parentEmail'] === $parentEmail;
+                    })
+                    ->values();
+            } else {
+                $studentId = $user->getKey();
+                $registration = DB::table('registration')
+                    ->where('studentId', $studentId)
+                    ->where('status', 'Approved')
+                    ->where('enrollmentYear', $year)
+                    ->first();
+
+                if (!$registration) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No approved registration found for ' . $year
+                    ], 404);
+                }
+
+                $monthlyFee = $registration->monthlyFee ?? 200.00;
+                $payments = Payment::where('registrationId', $registration->registrationId)
+                    ->where('paymentStatus', 'Paid')
+                    ->get();
             }
-            
-            $monthlyFee = $registration->monthlyFee ?? 200.00;
-            
-            // Get all PAID payments
-            $payments = Payment::where('registrationId', $registration->registrationId)
-                ->where('paymentStatus', 'Paid')
-                ->get();
             
             $paidMonths = [];
             foreach ($payments as $payment) {
@@ -108,75 +149,156 @@ class PaymentController extends Controller
 
         try {
             $user = $request->user();
-            $studentId = $user->getKey();
+            $isParent = $request->user()->tokenCan('parent');
+            $effectiveAmount = 0;
+            $registration = null;
+            $student = null;
+            $parentEmail = null;
 
-            $student = DB::table('student')->where('studentId', $studentId)->first();
-            
-            if (!$student) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Student not found'
-                ], 404);
-            }
-            
-            $registration = DB::table('registration')
-                ->where('studentId', $studentId)
-                ->where('status', 'Approved')
-                ->first();
+            if ($isParent) {
+                $parentEmail = $user->parentEmail;
+                $registrations = $this->getParentRegistrationsForYear($parentEmail, $request->year);
 
-            if (!$registration) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No approved registration found'
-                ], 400);
+                if ($registrations->isEmpty()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No linked children with approved registration found for ' . $request->year
+                    ], 400);
+                }
+
+                $effectiveAmount = (float) $registrations->sum(function ($r) {
+                    return floatval($r->monthlyFee ?? 0);
+                });
+
+                // Anchor parent payment to first linked registration
+                $registration = $registrations->first();
+                $linkedStudent = DB::table('student')
+                    ->join('registration', 'registration.studentId', '=', 'student.studentId')
+                    ->where('registration.registrationId', $registration->registrationId)
+                    ->select('student.name', 'student.phone')
+                    ->first();
+
+                $student = (object) [
+                    'name' => $linkedStudent->name ?? 'Parent',
+                    'email' => $parentEmail,
+                    'phone' => $linkedStudent->phone ?? '0123456789',
+                ];
+            } else {
+                $studentId = $user->getKey();
+                $student = DB::table('student')->where('studentId', $studentId)->first();
+                
+                if (!$student) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Student not found'
+                    ], 404);
+                }
+                
+                $registration = DB::table('registration')
+                    ->where('studentId', $studentId)
+                    ->where('status', 'Approved')
+                    ->where('enrollmentYear', $request->year)
+                    ->first();
+
+                if (!$registration) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No approved registration found for ' . $request->year
+                    ], 400);
+                }
+
+                $effectiveAmount = (float) $request->amount;
             }
 
             $monthName = date('F', mktime(0, 0, 0, $request->month, 1));
             $paymentRecord = null;
+            $paymentRecords = collect();
 
             // Check for existing payment (BOTH Paid AND Pending)
-            $existingPayments = Payment::where('registrationId', $registration->registrationId)
-                ->get();
-                
-            foreach ($existingPayments as $payment) {
-                $remark = json_decode($payment->remark, true);
-                if (isset($remark['month']) && isset($remark['year']) && 
-                    $remark['month'] == $request->month && $remark['year'] == $request->year) {
-                    
-                    // If payment is already Paid, prevent new payment
-                    if ($payment->paymentStatus === 'Paid') {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Payment for this month already exists and is paid'
-                        ], 400);
-                    }
-                    
-                    // If payment is Pending, use the existing record
-                    Log::info('Using existing pending payment record', [
-                        'payment_id' => $payment->paymentId,
-                        'month' => $request->month,
-                        'year' => $request->year
-                    ]);
-                    
-                    $paymentRecord = $payment;
-                    break;
-                }
-            }
+            if ($isParent) {
+                $parentRegistrations = $this->getParentRegistrationsForYear($parentEmail, $request->year);
 
-            // If no existing payment found, create new one
-            if (!$paymentRecord) {
-                $paymentRecord = Payment::create([
-                    'registrationId' => $registration->registrationId,
-                    'amount' => $request->amount,
-                    'datePaid' => now(),
-                    'paymentStatus' => 'Pending',
-                    'method' => 'Pending Payment',
-                    'remark' => json_encode([
-                        'month' => $request->month,
-                        'year' => $request->year,
-                        'monthName' => $monthName
-                    ])
-                ]);
+                foreach ($parentRegistrations as $reg) {
+                    $existingPayments = Payment::where('registrationId', $reg->registrationId)->get();
+                    $matchedPending = null;
+
+                    foreach ($existingPayments as $payment) {
+                        $remark = json_decode($payment->remark, true);
+                        if (
+                            isset($remark['month']) && isset($remark['year']) &&
+                            $remark['month'] == $request->month && $remark['year'] == $request->year &&
+                            (($remark['parentEmail'] ?? null) === $parentEmail)
+                        ) {
+                            if ($payment->paymentStatus === 'Paid') {
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'Payment for this month already exists and is paid'
+                                ], 400);
+                            }
+                            $matchedPending = $payment;
+                            break;
+                        }
+                    }
+
+                    if (!$matchedPending) {
+                        $matchedPending = Payment::create([
+                            'registrationId' => $reg->registrationId,
+                            'amount' => floatval($reg->monthlyFee ?? 0),
+                            'datePaid' => now(),
+                            'paymentStatus' => 'Pending',
+                            'method' => 'Pending Payment',
+                            'remark' => json_encode([
+                                'month' => $request->month,
+                                'year' => $request->year,
+                                'monthName' => $monthName,
+                                'parentEmail' => $parentEmail
+                            ]),
+                            'academicYear' => $request->year
+                        ]);
+                    }
+
+                    $paymentRecords->push($matchedPending);
+                }
+
+                $paymentRecord = $paymentRecords->first();
+            } else {
+                $existingPayments = Payment::where('registrationId', $registration->registrationId)
+                    ->get();
+                    
+                foreach ($existingPayments as $payment) {
+                    $remark = json_decode($payment->remark, true);
+                    if (isset($remark['month']) && isset($remark['year']) && 
+                        $remark['month'] == $request->month && $remark['year'] == $request->year) {
+                        
+                        // If payment is already Paid, prevent new payment
+                        if ($payment->paymentStatus === 'Paid') {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'Payment for this month already exists and is paid'
+                            ], 400);
+                        }
+                        
+                        $paymentRecord = $payment;
+                        break;
+                    }
+                }
+
+                if (!$paymentRecord) {
+                    $paymentRecord = Payment::create([
+                        'registrationId' => $registration->registrationId,
+                        'amount' => $effectiveAmount,
+                        'datePaid' => now(),
+                        'paymentStatus' => 'Pending',
+                        'method' => 'Pending Payment',
+                        'remark' => json_encode([
+                            'month' => $request->month,
+                            'year' => $request->year,
+                            'monthName' => $monthName,
+                            'parentEmail' => null
+                        ]),
+                        'academicYear' => $request->year
+                    ]);
+                }
             }
 
             $secretKey = env('TOYYIBPAY_SECRET_KEY');
@@ -194,25 +316,42 @@ class PaymentController extends Controller
             }
 
             // Update the payment record with new transaction info
-            $paymentRecord->transactionId = null; // Will be updated after bill creation
-            $paymentRecord->method = 'Pending Payment';
-            $paymentRecord->remark = json_encode([
-                'month' => $request->month,
-                'year' => $request->year,
-                'monthName' => $monthName
-            ]);
-            $paymentRecord->save();
+            if ($isParent) {
+                foreach ($paymentRecords as $record) {
+                    $record->transactionId = null;
+                    $record->method = 'Pending Payment';
+                    $record->remark = json_encode([
+                        'month' => $request->month,
+                        'year' => $request->year,
+                        'monthName' => $monthName,
+                        'parentEmail' => $parentEmail
+                    ]);
+                    $record->save();
+                }
+            } else {
+                $paymentRecord->transactionId = null; // Will be updated after bill creation
+                $paymentRecord->method = 'Pending Payment';
+                $paymentRecord->remark = json_encode([
+                    'month' => $request->month,
+                    'year' => $request->year,
+                    'monthName' => $monthName,
+                    'parentEmail' => null
+                ]);
+                $paymentRecord->save();
+            }
 
             // Use return URL that goes back to React with payment ID
             $billData = [
                 'userSecretKey' => $secretKey,
                 'categoryCode' => $categoryCode,
                 'billName' => "Tuition {$monthName} {$request->year}",
-                'billDescription' => "Monthly tuition fee",
+                'billDescription' => $isParent ? "Monthly tuition fee (linked children)" : "Monthly tuition fee",
                 'billPriceSetting' => 1,
                 'billPayorInfo' => 1,
-                'billAmount' => number_format($request->amount, 2, '.', '') * 100,
-                'billReturnUrl' => "http://localhost:3000/student/payment?payment_id={$paymentRecord->paymentId}",
+                'billAmount' => number_format($effectiveAmount, 2, '.', '') * 100,
+                'billReturnUrl' => $isParent
+                    ? "http://localhost:3000/parent/payment?payment_id={$paymentRecord->paymentId}"
+                    : "http://localhost:3000/student/payment?payment_id={$paymentRecord->paymentId}",
                 'billCallbackUrl' => 'http://localhost:8000/api/payments/toyyibpay/callback',
                 'billExternalReferenceNo' => 'PAY' . $paymentRecord->paymentId,
                 'billTo' => $student->name,
@@ -236,8 +375,15 @@ class PaymentController extends Controller
                 if (is_array($responseData) && isset($responseData[0]['BillCode'])) {
                     $billCode = $responseData[0]['BillCode'];
 
-                    $paymentRecord->transactionId = $billCode;
-                    $paymentRecord->save();
+                    if ($isParent) {
+                        foreach ($paymentRecords as $record) {
+                            $record->transactionId = $billCode;
+                            $record->save();
+                        }
+                    } else {
+                        $paymentRecord->transactionId = $billCode;
+                        $paymentRecord->save();
+                    }
 
                     $paymentUrl = "https://dev.toyyibpay.com/{$billCode}";
 
@@ -247,7 +393,7 @@ class PaymentController extends Controller
                             'paymentId' => $paymentRecord->paymentId,
                             'billCode' => $billCode,
                             'checkoutUrl' => $paymentUrl,
-                            'amount' => $request->amount,
+                            'amount' => $effectiveAmount,
                             'month' => $request->month,
                             'year' => $request->year
                         ]
@@ -256,7 +402,13 @@ class PaymentController extends Controller
             }
 
             // If bill creation failed, only delete if it was a new payment
-            if ($paymentRecord->wasRecentlyCreated) {
+            if ($isParent) {
+                foreach ($paymentRecords as $record) {
+                    if ($record->wasRecentlyCreated) {
+                        $record->delete();
+                    }
+                }
+            } else if ($paymentRecord->wasRecentlyCreated) {
                 $paymentRecord->delete();
             }
             
@@ -277,7 +429,7 @@ class PaymentController extends Controller
     /**
      * Verify payment status manually (called from frontend after redirect)
      */
-    public function verifyPaymentStatus(Request $request, $paymentId)
+     public function verifyPaymentStatus(Request $request, $paymentId)
     {
         try {
             $payment = Payment::find($paymentId);
@@ -322,20 +474,36 @@ class PaymentController extends Controller
                 // Check if there's a successful transaction
                 foreach ($transactions as $transaction) {
                     if ($transaction['billpaymentStatus'] == '1') { // Status 1 = Paid
-                        // Update payment
+                        // Update payment (for parent payments, update all linked child records in same bill/month/year)
                         $remark = json_decode($payment->remark, true);
-                        
-                        $payment->paymentStatus = 'Paid';
-                        $payment->datePaid = now();
-                        $payment->setAttribute('method', $transaction['billpaymentChannel'] ?? 'Online Payment');
-                        $payment->remark = json_encode([
-                            'month' => $remark['month'] ?? null,
-                            'year' => $remark['year'] ?? null,
-                            'monthName' => $remark['monthName'] ?? null,
-                            'paid_at' => now()->toDateTimeString(),
-                            'transaction_id' => $transaction['billpaymentInvoiceNo'] ?? null
-                        ]);
-                        $payment->save();
+                        $parentEmail = $remark['parentEmail'] ?? null;
+                        $targetPayments = collect([$payment]);
+
+                        if ($parentEmail) {
+                            $sameBillPayments = Payment::where('transactionId', $billCode)->get();
+                            $targetPayments = $sameBillPayments->filter(function ($p) use ($remark, $parentEmail) {
+                                $r = json_decode($p->remark, true);
+                                return ($r['month'] ?? null) == ($remark['month'] ?? null)
+                                    && ($r['year'] ?? null) == ($remark['year'] ?? null)
+                                    && ($r['parentEmail'] ?? null) === $parentEmail;
+                            })->values();
+                        }
+
+                        foreach ($targetPayments as $targetPayment) {
+                            $targetRemark = json_decode($targetPayment->remark, true);
+                            $targetPayment->paymentStatus = 'Paid';
+                            $targetPayment->datePaid = now();
+                            $targetPayment->setAttribute('method', $transaction['billpaymentChannel'] ?? 'Online Payment');
+                            $targetPayment->remark = json_encode([
+                                'month' => $targetRemark['month'] ?? null,
+                                'year' => $targetRemark['year'] ?? null,
+                                'monthName' => $targetRemark['monthName'] ?? null,
+                                'parentEmail' => $targetRemark['parentEmail'] ?? null,
+                                'paid_at' => now()->toDateTimeString(),
+                                'transaction_id' => $transaction['billpaymentInvoiceNo'] ?? null
+                            ]);
+                            $targetPayment->save();
+                        }
 
                         Log::info('Payment verified and updated', [
                             'payment_id' => $paymentId,
@@ -382,19 +550,35 @@ class PaymentController extends Controller
 
             if ($payment && $statusId == 1) {
                 $remark = json_decode($payment->remark, true);
-                
-                $payment->paymentStatus = 'Paid';
-                $payment->datePaid = now();
-                $payment->setAttribute('method', 'FPX Online Banking');
-                $payment->remark = json_encode([
-                    'month' => $remark['month'] ?? null,
-                    'year' => $remark['year'] ?? null,
-                    'monthName' => $remark['monthName'] ?? null,
-                    'paid_at' => now()->toDateTimeString()
-                ]);
-                $payment->save();
+                $parentEmail = $remark['parentEmail'] ?? null;
+                $targetPayments = collect([$payment]);
 
-                Log::info('Payment updated via callback', ['payment_id' => $payment->paymentId]);
+                if ($parentEmail) {
+                    $sameBillPayments = Payment::where('transactionId', $billCode)->get();
+                    $targetPayments = $sameBillPayments->filter(function ($p) use ($remark, $parentEmail) {
+                        $r = json_decode($p->remark, true);
+                        return ($r['month'] ?? null) == ($remark['month'] ?? null)
+                            && ($r['year'] ?? null) == ($remark['year'] ?? null)
+                            && ($r['parentEmail'] ?? null) === $parentEmail;
+                    })->values();
+                }
+
+                foreach ($targetPayments as $targetPayment) {
+                    $targetRemark = json_decode($targetPayment->remark, true);
+                    $targetPayment->paymentStatus = 'Paid';
+                    $targetPayment->datePaid = now();
+                    $targetPayment->setAttribute('method', 'FPX Online Banking');
+                    $targetPayment->remark = json_encode([
+                        'month' => $targetRemark['month'] ?? null,
+                        'year' => $targetRemark['year'] ?? null,
+                        'monthName' => $targetRemark['monthName'] ?? null,
+                        'parentEmail' => $targetRemark['parentEmail'] ?? null,
+                        'paid_at' => now()->toDateTimeString()
+                    ]);
+                    $targetPayment->save();
+                }
+
+                Log::info('Payment updated via callback', ['payment_id' => $payment->paymentId, 'updated_count' => $targetPayments->count()]);
             }
 
             return response('OK', 200);
@@ -413,16 +597,18 @@ class PaymentController extends Controller
         try {
             $user = $request->user();
             $studentId = $user->getKey();
+            $year = date('Y');
 
             $registration = DB::table('registration')
                 ->where('studentId', $studentId)
                 ->where('status', 'Approved')
+                ->where('enrollmentYear', $year)
                 ->first();
 
             if (!$registration) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No approved registration found'
+                    'message' => 'No approved registration found for ' . $year
                 ], 404);
             }
 
@@ -441,7 +627,42 @@ class PaymentController extends Controller
         }
     }
 
-    
+    /**
+     * Get available academic years from registrations
+     */
+    public function getAvailableYears()
+    {
+        try {
+            $years = DB::table('registration')
+                ->select('enrollmentYear')
+                ->where('status', 'Approved')
+                ->distinct()
+                ->orderBy('enrollmentYear', 'desc')
+                ->pluck('enrollmentYear')
+                ->toArray();
+
+            // Add current year if not present
+            $currentYear = date('Y');
+            if (!in_array($currentYear, $years)) {
+                array_unshift($years, $currentYear);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $years,
+                'current_year' => $currentYear
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('getAvailableYears failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'data' => [date('Y')],
+                'current_year' => date('Y')
+            ]);
+        }
+    }
+
     // ========================================
     // STAFF PAYMENT MANAGEMENT METHODS
     // ========================================
@@ -471,18 +692,15 @@ class PaymentController extends Controller
                     'student.name as studentName',
                     'student.email',
                     'registration.registrationId',
-                    'registration.classIds'
+                    'registration.classIds',
+                    'registration.enrollmentYear'
                 )
-                ->where('registration.status', 'Approved');
+                ->where('registration.status', 'Approved')
+                ->where('registration.enrollmentYear', $year);
 
-            // Filter by year
-            if ($year) {
-                $query->whereYear('payment.datePaid', $year);
-            }
-
-            // Filter by month
+            // Filter by month (from remark JSON)
             if ($month) {
-                $query->whereMonth('payment.datePaid', $month);
+                $query->whereRaw('JSON_EXTRACT(payment.remark, "$.month") = ?', [$month]);
             }
 
             // Filter by status
@@ -528,13 +746,15 @@ class PaymentController extends Controller
                     'transactionId' => $payment->transactionId,
                     'paymentMonth' => $paymentMonth,
                     'paymentYear' => $paymentYear,
+                    'enrollmentYear' => $payment->enrollmentYear,
                     'remark' => $payment->remark
                 ];
             }
 
             return response()->json([
                 'success' => true,
-                'data' => $paymentsWithClasses
+                'data' => $paymentsWithClasses,
+                'academic_year' => $year
             ]);
 
         } catch (\Exception $e) {
@@ -616,32 +836,40 @@ class PaymentController extends Controller
             $year = $request->query('year', date('Y'));
             $month = $request->query('month', date('n'));
 
-            // Total paid this month
+            // Total paid this month for this academic year
             $totalPaid = DB::table('payment')
-                ->whereYear('datePaid', $year)
-                ->whereMonth('datePaid', $month)
-                ->where('paymentStatus', 'Paid')
-                ->sum('amount');
+                ->join('registration', 'payment.registrationId', '=', 'registration.registrationId')
+                ->where('registration.enrollmentYear', $year)
+                ->whereRaw('JSON_EXTRACT(payment.remark, "$.year") = ?', [$year])
+                ->whereRaw('JSON_EXTRACT(payment.remark, "$.month") = ?', [$month])
+                ->where('payment.paymentStatus', 'Paid')
+                ->sum('payment.amount');
 
-            // Total pending this month
+            // Total pending this month for this academic year
             $totalPending = DB::table('payment')
-                ->whereYear('datePaid', $year)
-                ->whereMonth('datePaid', $month)
-                ->where('paymentStatus', 'Pending')
-                ->sum('amount');
+                ->join('registration', 'payment.registrationId', '=', 'registration.registrationId')
+                ->where('registration.enrollmentYear', $year)
+                ->whereRaw('JSON_EXTRACT(payment.remark, "$.year") = ?', [$year])
+                ->whereRaw('JSON_EXTRACT(payment.remark, "$.month") = ?', [$month])
+                ->where('payment.paymentStatus', 'Pending')
+                ->sum('payment.amount');
 
             // Count of paid payments
             $paidCount = DB::table('payment')
-                ->whereYear('datePaid', $year)
-                ->whereMonth('datePaid', $month)
-                ->where('paymentStatus', 'Paid')
+                ->join('registration', 'payment.registrationId', '=', 'registration.registrationId')
+                ->where('registration.enrollmentYear', $year)
+                ->whereRaw('JSON_EXTRACT(payment.remark, "$.year") = ?', [$year])
+                ->whereRaw('JSON_EXTRACT(payment.remark, "$.month") = ?', [$month])
+                ->where('payment.paymentStatus', 'Paid')
                 ->count();
 
             // Count of pending payments
             $pendingCount = DB::table('payment')
-                ->whereYear('datePaid', $year)
-                ->whereMonth('datePaid', $month)
-                ->where('paymentStatus', 'Pending')
+                ->join('registration', 'payment.registrationId', '=', 'registration.registrationId')
+                ->where('registration.enrollmentYear', $year)
+                ->whereRaw('JSON_EXTRACT(payment.remark, "$.year") = ?', [$year])
+                ->whereRaw('JSON_EXTRACT(payment.remark, "$.month") = ?', [$month])
+                ->where('payment.paymentStatus', 'Pending')
                 ->count();
 
             return response()->json([
@@ -674,7 +902,7 @@ class PaymentController extends Controller
             $year = $request->query('year', date('Y'));
             $month = $request->query('month', date('n'));
 
-            // Get all approved registrations with student details
+            // Get all approved registrations for the specific academic year
             $students = DB::table('registration')
                     ->join('student', 'registration.studentId', '=', 'student.studentId')
                     ->leftJoin('payment', function($join) use ($year, $month) {
@@ -691,6 +919,7 @@ class PaymentController extends Controller
                         'registration.classIds',
                         'registration.monthlyFee',
                         'registration.status as registrationStatus',
+                        'registration.enrollmentYear',
                         'payment.paymentId',
                         'payment.amount',
                         'payment.datePaid',
@@ -700,6 +929,7 @@ class PaymentController extends Controller
                         'payment.remark'
                     )
                     ->where('registration.status', 'Approved')
+                    ->where('registration.enrollmentYear', $year)
                     ->orderBy('student.name')
                     ->get();
 
@@ -717,14 +947,10 @@ class PaymentController extends Controller
                             ->first();
 
                     if ($class) {
-                        // Check if form already contains "Form" text
                         $formText = $class->form;
-                        
-                        // If form already has "Form" in it, use it as is, otherwise add "Form"
                         if (strpos($formText, 'Form') === false && strpos($formText, 'form') === false) {
                             $formText = 'Form ' . $formText;
                         }
-                        
                         $classNames[] = $class->subjectName . ' (' . $formText . ')';
                     }
                 }
@@ -749,11 +975,12 @@ class PaymentController extends Controller
                         'transactionId' => $student->transactionId,
                         'paymentMonth' => $remark['monthName'] ?? null,
                         'paymentYear' => $remark['year'] ?? null,
+                        'enrollmentYear' => $student->enrollmentYear,
                         'month' => (int)$month,
                         'year' => (int)$year
                     ];
                 } else {
-                    // No payment record exists for this month
+                    // No payment record exists for this month/year
                     $result[] = [
                         'paymentId' => null,
                         'studentId' => $student->studentId,
@@ -762,13 +989,14 @@ class PaymentController extends Controller
                         'phone' => $student->phone,
                         'classes' => implode(', ', $classNames),
                         'monthlyFee' => (float)$student->monthlyFee,
-                        'amount' => (float)$student->monthlyFee, // Default amount
+                        'amount' => (float)$student->monthlyFee,
                         'datePaid' => null,
                         'method' => null,
                         'paymentStatus' => 'Pending',
                         'transactionId' => null,
                         'paymentMonth' => null,
                         'paymentYear' => null,
+                        'enrollmentYear' => $student->enrollmentYear,
                         'month' => (int)$month,
                         'year' => (int)$year
                     ];
@@ -820,16 +1048,17 @@ class PaymentController extends Controller
         }
 
         try {
-            // Get registration for this student
+            // Get registration for this student for the specific academic year
             $registration = DB::table('registration')
                 ->where('studentId', $request->studentId)
                 ->where('status', 'Approved')
+                ->where('enrollmentYear', $request->year)
                 ->first();
 
             if (!$registration) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No approved registration found for this student'
+                    'message' => 'No approved registration found for this student for ' . $request->year
                 ], 404);
             }
 
@@ -875,6 +1104,7 @@ class PaymentController extends Controller
                     'datePaid' => $request->datePaid ?? ($request->paymentStatus === 'Paid' ? now() : null),
                     'paymentStatus' => $request->paymentStatus,
                     'method' => $request->input('method'),
+                    'academicYear' => $request->year,
                     'remark' => json_encode([
                         'month' => $request->month,
                         'year' => $request->year,
@@ -905,4 +1135,6 @@ class PaymentController extends Controller
             ], 500);
         }
     }
+
+    
 }

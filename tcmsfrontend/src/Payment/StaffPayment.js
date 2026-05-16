@@ -1,3 +1,4 @@
+// src/Pages/StaffPayment.js
 import React, { useState, useEffect } from 'react';
 import {
   Table, Button, Modal, Select, DatePicker, Input, message, Card, Row, Col, Statistic, Tag, Space, Typography, Flex
@@ -23,6 +24,8 @@ const StaffPayment = () => {
   const [selectedDate, setSelectedDate] = useState(moment());
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [availableYears, setAvailableYears] = useState([]);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [stats, setStats] = useState({
     totalStudents: 0,
     paidCount: 0,
@@ -42,6 +45,27 @@ const StaffPayment = () => {
     method: '',
     datePaid: null
   });
+
+  // Fetch available years
+  const fetchAvailableYears = async () => {
+    try {
+      const res = await axios.get(
+        'http://localhost:8000/api/payments/available-years',
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      );
+      if (res.data.success) {
+        setAvailableYears(res.data.data);
+        setCurrentYear(res.data.current_year);
+        // Set year to the first available year or current year
+        if (res.data.data.length > 0) {
+          setYear(res.data.data[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching years:', error);
+      setAvailableYears([currentYear]);
+    }
+  };
 
   const fetchStudentsPaymentStatus = async () => {
     setLoading(true);
@@ -76,7 +100,13 @@ const StaffPayment = () => {
   };
 
   useEffect(() => {
-    fetchStudentsPaymentStatus();
+    fetchAvailableYears();
+  }, []);
+
+  useEffect(() => {
+    if (year) {
+      fetchStudentsPaymentStatus();
+    }
   }, [year, month]);
 
   useEffect(() => {
@@ -99,7 +129,7 @@ const StaffPayment = () => {
       setEditForm(prev => ({ 
         ...prev, 
         datePaid: null,
-        method: '' // Clear method when status is Pending
+        method: ''
       }));
     }
   }, [editForm.paymentStatus]);
@@ -123,11 +153,11 @@ const StaffPayment = () => {
 
   const goToNextMonth = () => {
     const currentDate = moment();
-    const currentYear = currentDate.year();
-    const currentMonth = currentDate.month() + 1;
+    const currentYearNum = currentDate.year();
+    const currentMonthNum = currentDate.month() + 1;
     
     // Don't allow going to future months
-    if (year > currentYear || (year === currentYear && month >= currentMonth)) {
+    if (year > currentYearNum || (year === currentYearNum && month >= currentMonthNum)) {
       message.info('Cannot view future months');
       return;
     }
@@ -141,19 +171,32 @@ const StaffPayment = () => {
   };
 
   const handleEdit = (record) => {
+    // Prevent editing if viewing past year
+    if (year !== currentYear) {
+      message.warning('You can only edit payments for the current academic year');
+      return;
+    }
+    
     setSelectedStudent(record);
     setEditForm({
       paymentId: record.paymentId,
       studentId: record.studentId,
       amount: record.amount || record.monthlyFee,
       paymentStatus: record.paymentStatus,
-      method: record.paymentStatus === 'Paid' ? (record.method || '') : '', // Only set method if status is Paid
+      method: record.paymentStatus === 'Paid' ? (record.method || '') : '',
       datePaid: record.paymentStatus === 'Paid' && record.datePaid ? moment(record.datePaid) : null
     });
     setModalVisible(true);
   };
 
   const handleSaveEdit = async () => {
+    // Prevent saving if viewing past year
+    if (year !== currentYear) {
+      message.warning('You cannot edit payments for past academic years');
+      setModalVisible(false);
+      return;
+    }
+    
     try {
       const payload = {
         studentId: editForm.studentId,
@@ -161,7 +204,7 @@ const StaffPayment = () => {
         year: year,
         amount: editForm.amount,
         paymentStatus: editForm.paymentStatus,
-        method: editForm.paymentStatus === 'Paid' ? editForm.method : null, // Only send method if Paid
+        method: editForm.paymentStatus === 'Paid' ? editForm.method : null,
         datePaid: editForm.paymentStatus === 'Paid' && editForm.datePaid 
           ? editForm.datePaid.startOf('day').format('YYYY-MM-DD HH:mm:ss') 
           : null
@@ -192,7 +235,6 @@ const StaffPayment = () => {
 
   // Helper function to clean class names (remove duplicate "Form")
   const formatClassName = (className) => {
-    // Check if the className already contains "Form"
     if (className.includes('Form')) {
       return className;
     }
@@ -300,17 +342,28 @@ const StaffPayment = () => {
       key: 'action',
       width: 80,
       align: 'center',
-      render: (_, record) => (
-        <Button
-          type="primary"
-          size="middle"
-          icon={<EditOutlined />}
-          onClick={() => handleEdit(record)}
-          style={{ background: '#3b1fa3', borderColor: '#3b1fa3', height: 32, fontSize: 13 }}
-        >
-          Edit
-        </Button>
-      ),
+      render: (_, record) => {
+        // Disable edit button for past years
+        const isPastYear = year !== currentYear;
+        return (
+          <Button
+            type="primary"
+            size="middle"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+            disabled={isPastYear}
+            title={isPastYear ? 'Cannot edit past year records' : 'Edit Payment'}
+            style={{ 
+              background: isPastYear ? '#d9d9d9' : '#3b1fa3', 
+              borderColor: isPastYear ? '#d9d9d9' : '#3b1fa3', 
+              height: 32, 
+              fontSize: 13 
+            }}
+          >
+            Edit
+          </Button>
+        );
+      },
     },
   ];
 
@@ -435,16 +488,39 @@ const StaffPayment = () => {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Add a warning banner for past years
+  const isPastYear = year !== currentYear;
+
+  if (!year) {
+    return (
+      <div style={styles.page}>
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
       <div style={styles.header}>
         <Title level={2} style={{ margin: 0, color: '#3b1fa3' }}>
           MONTHLY STUDENT PAYMENTS
         </Title>
-        <Title level={4} style={{ margin: '8px 0 0 0', fontWeight: 400, color: '#666' }}>
-          {monthNames[month - 1]} {year}
-        </Title>
+        {/* <Title level={4} style={{ margin: '8px 0 0 0', fontWeight: 400, color: '#666' }}>
+          {monthNames[month - 1]} {year} {year === currentYear && '(Current Academic Year)'}
+        </Title> */}
       </div>
+
+      {/* Warning banner for past years */}
+      {/* {isPastYear && (
+        <Card style={{ marginBottom: 20, background: '#fffbe6', borderColor: '#ffe58f' }}>
+          <div style={{ textAlign: 'center', color: '#ad6800' }}>
+            <strong>⚠️ Read-Only Mode:</strong> You are viewing records for {year}. 
+            Only the current academic year ({currentYear}) records can be edited.
+          </div>
+        </Card>
+      )} */}
 
       <div style={styles.yearMonthSelector}>
         <Button
@@ -470,8 +546,10 @@ const StaffPayment = () => {
             style={{ width: 100 }}
             size="large"
           >
-            {[2024, 2025, 2026, 2027].map(y => (
-              <Option key={y} value={y}>{y}</Option>
+            {availableYears.map(y => (
+              <Option key={y} value={y}>
+                {y} {y === currentYear}
+              </Option>
             ))}
           </Select>
         </div>
@@ -517,10 +595,10 @@ const StaffPayment = () => {
           loading={loading}
           rowKey="studentId"
           pagination={{
-            pageSize: 15,
+            pageSize: 10,
             showSizeChanger: true,
-            showTotal: (total) => `Total ${total} students`,
-            pageSizeOptions: ['15', '30', '50'],
+            showTotal: (total) => `Total ${total} students for ${year}`,
+            pageSizeOptions: ['10', '20', '50', '100'],
             size: 'default'
           }}
           scroll={{ x: '100%' }}
@@ -532,11 +610,11 @@ const StaffPayment = () => {
         />
       </div>
 
-      {/* Edit Payment Modal */}
+      {/* Edit Payment Modal - Only shown for current year */}
       <Modal
         title={
           <div style={styles.modalTitle}>
-            Edit Payment
+            Edit Payment - {year} Academic Year
           </div>
         }
         open={modalVisible}
