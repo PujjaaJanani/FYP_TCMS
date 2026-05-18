@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use App\Models\Authority;
 use App\Models\Student;
@@ -17,11 +20,11 @@ class AuthController extends Controller
     {
         // Validate the request
         $request->validate([
-            'email'    => 'required|email',
+            'email' => 'required|email',
             'password' => 'required|string',
         ]);
 
-        $email    = $request->email;
+        $email = $request->email;
         $password = $request->password;
         $currentYear = date('Y');
 
@@ -34,14 +37,14 @@ class AuthController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Login successful',
-                'data'    => [
+                'data' => [
                     'token' => $token,
-                    'user'  => [
-                        'id'       => $authority->authorityId,
-                        'name'     => $authority->name,
-                        'email'    => $authority->email,
-                        'phone'    => $authority->phone,
-                        'role'     => $authority->role,
+                    'user' => [
+                        'id' => $authority->authorityId,
+                        'name' => $authority->name,
+                        'email' => $authority->email,
+                        'phone' => $authority->phone,
+                        'role' => $authority->role,
                         'userType' => 'authority',
                     ],
                 ],
@@ -90,14 +93,14 @@ class AuthController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Login successful',
-                'data'    => [
+                'data' => [
                     'token' => $token,
-                    'user'  => [
-                        'id'       => $student->studentId,
-                        'name'     => $student->name,
-                        'email'    => $student->email,
-                        'phone'    => $student->phone,
-                        'address'  => $student->address,
+                    'user' => [
+                        'id' => $student->studentId,
+                        'name' => $student->name,
+                        'email' => $student->email,
+                        'phone' => $student->phone,
+                        'address' => $student->address,
                         'userType' => 'student',
                     ],
                 ],
@@ -141,12 +144,12 @@ class AuthController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Parent login successful',
-                'data'    => [
+                'data' => [
                     'token' => $token,
-                    'user'  => [
-                        'id'       => $parentAuthStudent->studentId,
-                        'name'     => $parentAuthStudent->name,
-                        'email'    => $parentAuthStudent->parentEmail,
+                    'user' => [
+                        'id' => $parentAuthStudent->studentId,
+                        'name' => $parentAuthStudent->name,
+                        'email' => $parentAuthStudent->parentEmail,
                         'userType' => 'parent',
                         'linkedChildrenCount' => count($linkedStudentIds),
                         'enrollmentYear' => $currentYear,
@@ -180,7 +183,7 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
-        
+
         if (!$user) {
             return response()->json([
                 'success' => false,
@@ -191,12 +194,12 @@ class AuthController extends Controller
         if ($user instanceof Authority) {
             return response()->json([
                 'success' => true,
-                'data'    => [
-                    'id'       => $user->authorityId,
-                    'name'     => $user->name,
-                    'email'    => $user->email,
-                    'phone'    => $user->phone,
-                    'role'     => $user->role,
+                'data' => [
+                    'id' => $user->authorityId,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'role' => $user->role,
                     'userType' => 'authority',
                 ],
             ], 200);
@@ -215,10 +218,10 @@ class AuthController extends Controller
 
                 return response()->json([
                     'success' => true,
-                    'data'    => [
-                        'id'       => $user->studentId,
-                        'name'     => $user->name,
-                        'email'    => $user->parentEmail,
+                    'data' => [
+                        'id' => $user->studentId,
+                        'name' => $user->name,
+                        'email' => $user->parentEmail,
                         'userType' => 'parent',
                         'linkedChildrenCount' => count($linkedStudentIds),
                         'enrolled_for_current_year' => $hasCurrentYearEnrollment,
@@ -235,16 +238,226 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data'    => [
-                    'id'       => $user->studentId,
-                    'name'     => $user->name,
-                    'email'    => $user->email,
-                    'phone'    => $user->phone,
-                    'address'  => $user->address,
+                'data' => [
+                    'id' => $user->studentId,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'address' => $user->address,
                     'userType' => 'student',
                     'enrolled_for_current_year' => $currentYearRegistration,
                 ],
             ], 200);
         }
+    }
+
+    /**
+     * Send password reset link
+     * POST /api/auth/forgot-password
+     */
+    public function forgotPassword(Request $request)
+    {
+        $validator = validator($request->all(), [
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $email = $request->email;
+        $user = null;
+        $userType = null;
+
+        // Check if email belongs to authority (admin/staff)
+        $authority = Authority::where('email', $email)->first();
+        if ($authority) {
+            $user = $authority;
+            $userType = 'authority';
+            $userTable = 'authority';
+            $userIdField = 'authorityId';
+            $userName = $authority->name;
+        }
+
+        // Check if email belongs to student
+        if (!$user) {
+            $student = Student::where('email', $email)->first();
+            if ($student) {
+                $user = $student;
+                $userType = 'student';
+                $userTable = 'student';
+                $userIdField = 'studentId';
+                $userName = $student->name;
+            }
+        }
+
+        // Check if email belongs to parent (via parentEmail in student table)
+        if (!$user) {
+            $parent = Student::where('parentEmail', $email)->first();
+            if ($parent) {
+                $user = $parent;
+                $userType = 'parent';
+                $userTable = 'student';
+                $userIdField = 'studentId';
+                $userName = 'Parent';
+            }
+        }
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email address not found in our records.',
+            ], 404);
+        }
+
+        // Generate secure token
+        $plainToken = Str::random(64);
+        $hashedToken = Hash::make($plainToken);
+
+        // Store token in password_reset_tokens table
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $email],
+            [
+                'token' => $hashedToken,
+                'created_at' => Carbon::now(),
+                'user_type' => $userType  // Store user type for reference
+            ]
+        );
+
+        // Build reset link for frontend
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+        $resetLink = $frontendUrl . '/reset-password?token=' . $plainToken . '&email=' . urlencode($email);
+
+        // Send email
+try {
+    \Log::info('=== EMAIL SENDING DEBUG ===');
+    \Log::info('Email to: ' . $email);
+    \Log::info('User name: ' . $userName);
+    \Log::info('User type: ' . $userType);
+    \Log::info('Reset link: ' . $resetLink);
+    
+    // Check if view exists
+    $viewPath = resource_path('views/emails/password-reset.blade.php');
+    \Log::info('View file exists: ' . (file_exists($viewPath) ? 'YES' : 'NO'));
+    
+    Mail::send('emails.password-reset', [
+        'name' => $userName,
+        'resetLink' => $resetLink,
+        'userType' => $userType
+    ], function ($message) use ($email, $userName) {
+        $message->to($email, $userName)
+            ->subject('Reset Your Password - TCMS');
+    });
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Password reset link has been sent to your email.',
+    ]);
+} catch (\Exception $e) {
+    \Log::error('Email failed: ' . $e->getMessage());
+    \Log::error('Error trace: ' . $e->getTraceAsString());
+    
+    return response()->json([
+        'success' => false,
+        'message' => 'Failed to send reset email: ' . $e->getMessage(),
+    ], 500);
+}
+    }
+
+    /**
+     * Reset password using token
+     * POST /api/auth/reset-password
+     */
+    public function resetPassword(Request $request)
+    {
+        $validator = validator($request->all(), [
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'password' => 'required|string|min:6|confirmed',
+            'password_confirmation' => 'required|string',
+            'user_type' => 'nullable|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Find token record
+        $record = DB::table('password_reset_tokens')
+            ->where('email', $request->email)
+            ->first();
+
+        if (!$record) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired reset link.',
+            ], 400);
+        }
+
+        // Check if token is expired (60 minutes)
+        if (Carbon::parse($record->created_at)->addMinutes(60)->isPast()) {
+            DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'Reset link has expired. Please request a new one.',
+            ], 400);
+        }
+
+        // Verify token
+        if (!Hash::check($request->token, $record->token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid reset token.',
+            ], 400);
+        }
+
+        // Determine user type from stored record or by checking tables
+        $userType = $record->user_type ?? null;
+
+        if (!$userType) {
+            // Fallback: check which table has this email
+            if (Authority::where('email', $request->email)->exists()) {
+                $userType = 'authority';
+            } elseif (Student::where('email', $request->email)->exists()) {
+                $userType = 'student';
+            } elseif (Student::where('parentEmail', $request->email)->exists()) {
+                $userType = 'parent';
+            }
+        }
+
+        // Update password based on user type
+        $passwordUpdated = false;
+
+        if ($userType === 'authority') {
+            $passwordUpdated = Authority::where('email', $request->email)
+                ->update(['password' => Hash::make($request->password)]);
+        } elseif ($userType === 'student') {
+            $passwordUpdated = Student::where('email', $request->email)
+                ->update(['password' => Hash::make($request->password)]);
+        } elseif ($userType === 'parent') {
+            $passwordUpdated = Student::where('parentEmail', $request->email)
+                ->update(['parentPassword' => Hash::make($request->password)]);
+        }
+
+        if (!$passwordUpdated) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update password. User not found.',
+            ], 404);
+        }
+
+        // Delete the used token
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password has been reset successfully. Please login with your new password.',
+        ]);
     }
 }
