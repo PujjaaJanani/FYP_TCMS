@@ -1,19 +1,17 @@
-// FooterBar.js
-import { Layout } from 'antd';
-const { Footer } = Layout;
+import React from 'react';
+import { Typography } from 'antd';
+import './Footer.css';
 
-function FooterBar() {
+const { Text } = Typography;
+
+const Footer = () => {
   return (
-    <Footer
-      style={{
-        textAlign: 'center',
-        padding: '16px 0',
-        background: '#f0f2f5',
-      }}
-    >
-      Hari's Tuition Center ©{new Date().getFullYear()} Created by InfintiX
-    </Footer>
+    <footer className="app-footer">
+      <Text className="footer-copyright">
+        © 2024 Hari's Tuition Center. All rights reserved.
+      </Text>
+    </footer>
   );
-}
+};
 
 export default Footer;

@@ -332,39 +332,39 @@ class AuthController extends Controller
         $resetLink = $frontendUrl . '/reset-password?token=' . $plainToken . '&email=' . urlencode($email);
 
         // Send email
-try {
-    \Log::info('=== EMAIL SENDING DEBUG ===');
-    \Log::info('Email to: ' . $email);
-    \Log::info('User name: ' . $userName);
-    \Log::info('User type: ' . $userType);
-    \Log::info('Reset link: ' . $resetLink);
-    
-    // Check if view exists
-    $viewPath = resource_path('views/emails/password-reset.blade.php');
-    \Log::info('View file exists: ' . (file_exists($viewPath) ? 'YES' : 'NO'));
-    
-    Mail::send('emails.password-reset', [
-        'name' => $userName,
-        'resetLink' => $resetLink,
-        'userType' => $userType
-    ], function ($message) use ($email, $userName) {
-        $message->to($email, $userName)
-            ->subject('Reset Your Password - TCMS');
-    });
+        try {
+            \Log::info('=== EMAIL SENDING DEBUG ===');
+            \Log::info('Email to: ' . $email);
+            \Log::info('User name: ' . $userName);
+            \Log::info('User type: ' . $userType);
+            \Log::info('Reset link: ' . $resetLink);
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Password reset link has been sent to your email.',
-    ]);
-} catch (\Exception $e) {
-    \Log::error('Email failed: ' . $e->getMessage());
-    \Log::error('Error trace: ' . $e->getTraceAsString());
-    
-    return response()->json([
-        'success' => false,
-        'message' => 'Failed to send reset email: ' . $e->getMessage(),
-    ], 500);
-}
+            // Check if view exists
+            $viewPath = resource_path('views/emails/password-reset.blade.php');
+            \Log::info('View file exists: ' . (file_exists($viewPath) ? 'YES' : 'NO'));
+
+            Mail::send('emails.password-reset', [
+                'name' => $userName,
+                'resetLink' => $resetLink,
+                'userType' => $userType
+            ], function ($message) use ($email, $userName) {
+                $message->to($email, $userName)
+                    ->subject('Reset Your Password - TCMS');
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password reset link has been sent to your email.',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Email failed: ' . $e->getMessage());
+            \Log::error('Error trace: ' . $e->getTraceAsString());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send reset email: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -400,12 +400,12 @@ try {
             ], 400);
         }
 
-        // Check if token is expired (60 minutes)
-        if (Carbon::parse($record->created_at)->addMinutes(60)->isPast()) {
+        // Check if token is expired (10 minutes)
+        if (Carbon::parse($record->created_at)->addMinutes(10)->isPast()) {
             DB::table('password_reset_tokens')->where('email', $request->email)->delete();
             return response()->json([
                 'success' => false,
-                'message' => 'Reset link has expired. Please request a new one.',
+                'message' => 'Reset link has expired (10 minutes limit). Please request a new one.',
             ], 400);
         }
 

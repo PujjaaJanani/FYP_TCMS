@@ -92,7 +92,7 @@
                 If you didn't request this, please ignore this email. Your password will remain unchanged.
             </div>
             <div class="note">
-                <strong>Note:</strong> This link will expire in 60 minutes for security reasons.
+                <strong>Note:</strong> This link will expire in 10 minutes for security reasons.
                 <br><br>
                 If the button doesn't work, copy and paste this link into your browser:
                 <br>

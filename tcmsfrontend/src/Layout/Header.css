@@ -1,0 +1,371 @@
+/* src/Layout/Header.css */
+
+/* ============================================
+   HEADER - Main Container
+   ============================================ */
+.header {
+  background: linear-gradient(135deg, #5a4fcf 0%, #6a3e8a 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+}
+
+.header-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 70px;
+}
+
+/* ============================================
+   BRAND / LOGO
+   ============================================ */
+.header-brand {
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  font-style: italic;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.header-brand:hover {
+  opacity: 0.9;
+}
+
+/* ============================================
+   DESKTOP NAVIGATION - Reduced spacing
+   ============================================ */
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Reduced from 32px to 8px */
+  margin-left: auto;
+  margin-right: 24px;
+}
+
+.nav-link {
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  padding: 8px 12px; /* Reduced horizontal padding from 16px to 12px */
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  position: relative;
+  white-space: nowrap;
+}
+
+/* Active link styling - shows current page */
+.nav-link.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  position: relative;
+}
+
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 60%;
+  height: 2px;
+  background: white;
+  transform: translateX(-50%);
+  border-radius: 2px;
+}
+
+/* Hover effect - transparent background */
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+.nav-link:hover::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 60%;
+  height: 2px;
+  background: white;
+  transform: translateX(-50%);
+  border-radius: 2px;
+}
+
+/* ============================================
+   ACTION BUTTONS (Enroll & Login)
+   ============================================ */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Enroll Button Styles - Fixed hover issue */
+.enroll-btn {
+  background: transparent;
+  border: 2px solid white;
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  height: 38px;
+  padding: 0 24px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.enroll-btn:hover {
+  background: white !important;
+  border-color: white !important;
+  color: #5a4fcf !important; /* Text changes to purple on hover */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Login Button Styles */
+.login-btn {
+  background: white;
+  color: #5a4fcf;
+  border: none;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  height: 38px;
+  padding: 0 24px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+}
+
+.login-btn:hover {
+  background: #f8f9ff !important;
+  color: #5a4fcf !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ============================================
+   MOBILE MENU TOGGLE
+   ============================================ */
+.mobile-menu-toggle {
+  display: none;
+  background: transparent;
+  border: 2px solid white;
+  color: white;
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-menu-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   MOBILE NAVIGATION
+   ============================================ */
+.mobile-nav {
+  display: none;
+  flex-direction: column;
+  background: linear-gradient(135deg, #5a4fcf 0%, #6a3e8a 100%);
+  position: absolute;
+  top: 70px;
+  left: 0;
+  right: 0;
+  padding: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.mobile-nav-open {
+  max-height: 500px;
+  padding: 20px 40px;
+}
+
+.mobile-nav-link {
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  padding: 14px 20px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+/* Active mobile link styling */
+.mobile-nav-link.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.mobile-nav-link:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+/* Mobile Enroll Button - Fixed hover issue */
+.mobile-enroll-btn {
+  background: transparent;
+  border: 2px solid white;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  height: 44px;
+  border-radius: 6px;
+  margin-top: 8px;
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
+}
+
+.mobile-enroll-btn:hover {
+  background: white !important;
+  border-color: white !important;
+  color: #5a4fcf !important;
+}
+
+/* Mobile Login Button */
+.mobile-login-btn {
+  background: white;
+  color: #5a4fcf;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  height: 44px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.mobile-login-btn:hover {
+  background: #f8f9ff !important;
+  color: #5a4fcf !important;
+}
+
+/* ============================================
+   RESPONSIVE BREAKPOINTS
+   ============================================ */
+
+/* Tablet & Mobile */
+@media (max-width: 992px) {
+  .header-container {
+    padding: 0 24px;
+  }
+
+  .desktop-nav,
+  .desktop-actions {
+    display: none;
+  }
+
+  .mobile-menu-toggle,
+  .mobile-nav {
+    display: flex;
+  }
+
+  .header-brand {
+    font-size: 18px;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+  .header-container {
+    padding: 0 16px;
+    height: 60px;
+  }
+
+  .header {
+    position: sticky;
+  }
+
+  .mobile-nav {
+    top: 60px;
+    padding: 16px 20px;
+  }
+
+  .mobile-nav-open {
+    padding: 16px 20px;
+  }
+
+  .header-brand {
+    font-size: 16px;
+  }
+
+  .mobile-menu-toggle {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .mobile-nav-link {
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+
+  .mobile-enroll-btn,
+  .mobile-login-btn {
+    height: 40px;
+    font-size: 13px;
+  }
+}
+
+/* Very Small Mobile */
+@media (max-width: 360px) {
+  .header-brand {
+    font-size: 14px;
+  }
+
+  .mobile-nav-link {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+
+  .mobile-enroll-btn,
+  .mobile-login-btn {
+    font-size: 12px;
+    height: 38px;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+.nav-link:focus,
+.mobile-nav-link:focus,
+.enroll-btn:focus,
+.login-btn:focus,
+.mobile-enroll-btn:focus,
+.mobile-login-btn:focus,
+.mobile-menu-toggle:focus {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+/* ============================================
+   SMOOTH SCROLLING
+   ============================================ */
+html {
+  scroll-behavior: smooth;
+}
