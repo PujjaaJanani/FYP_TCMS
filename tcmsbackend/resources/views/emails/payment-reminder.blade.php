@@ -78,10 +78,10 @@
             
             <div style="text-align: center; margin: 30px 0;">
                 <div class="amount">RM {{ number_format($totalFee, 2) }}</div>
-                <p>Due Date: <strong>{{ $dueDate }}</strong></p>
+                <p><strong>Due for: {{ $dueMonth }}</strong></p>
             </div>
             
-            <p>Please log in to your account to make the payment before the due date to avoid any late fees.</p>
+            <p>Please log in to your account to make the payment as soon as possible.</p>
             
             <div style="text-align: center;">
                 <a href="{{ url('/parent/payment') }}" class="button">Pay Now</a>

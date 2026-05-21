@@ -14,17 +14,17 @@ class PaymentReminderMail extends Mailable
 
     public $childrenNames;
     public $totalFee;
-    public $dueDate;
+    public $dueMonth;
     public $pendingCount;
 
     /**
      * Create a new message instance.
      */
-    public function __construct($childrenNames, $totalFee, $dueDate, $pendingCount)
+    public function __construct($childrenNames, $totalFee, $dueMonth, $pendingCount)
     {
         $this->childrenNames = $childrenNames;
         $this->totalFee = $totalFee;
-        $this->dueDate = $dueDate;
+        $this->dueMonth = $dueMonth;
         $this->pendingCount = $pendingCount;
     }
 

@@ -117,12 +117,12 @@ class SendParentPaymentReminders extends Command
             }
 
             // Prepare due date message
-            $dueDate = $reminderType === 'first_day'
-                ? $today->copy()->endOfMonth()->format('F j, Y')
-                : $today->copy()->addDays(15)->format('F j, Y');
+            $monthName = $today->format('F'); // e.g., "May"
+            $dueMonth = $monthName . ' ' . $currentYear; // e.g., "May 2026"
 
             // Convert array to collection for pluck() method
             $pendingChildrenCollection = collect($pendingChildren);
+
 
             // Build children names string
             $childrenNames = $pendingChildrenCollection->pluck('studentName')->implode(', ');
@@ -131,7 +131,7 @@ class SendParentPaymentReminders extends Command
             $childText = $childCount > 1 ? 'children' : 'child';
 
             // SMS message (shorter for SMS)
-            $smsMessage = "Dear Parent, tuition fee for {$childrenNames} (RM{$totalFee}) is due on {$dueDate}. Please login to pay. - Hari's Tuition Center";
+            $smsMessage = "Dear Parent, tuition fee for {$childrenNames} (RM{$totalFee}) is due for {$dueMonth}. Please login to pay. - Hari's Tuition Center";
 
             // Send SMS
             $smsSent = false;
@@ -155,7 +155,7 @@ class SendParentPaymentReminders extends Command
                     Mail::to($parent->parentEmail)->send(new PaymentReminderMail(
                         $childrenNames,
                         $totalFee,
-                        $dueDate,
+                        $dueMonth,
                         $childCount
                     ));
                     $emailSent = true;
