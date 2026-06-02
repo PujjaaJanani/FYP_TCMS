@@ -18,6 +18,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { getToken } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -46,13 +47,13 @@ const EditClassSchedule = () => {
   const fetchData = async () => {
     try {
       const [subjectsRes, teachersRes, classesRes] = await Promise.all([
-        axios.get('http://localhost:8000/api/subjects/manage', {
+        axios.get(apiUrl('/api/subjects/with-classes'), {
           headers: { Authorization: `Bearer ${getToken()}` }
         }),
-        axios.get('http://localhost:8000/api/teachers', {
+        axios.get(apiUrl('/api/teachers'), {
           headers: { Authorization: `Bearer ${getToken()}` }
         }),
-        axios.get('http://localhost:8000/api/classes/schedule', {
+        axios.get(apiUrl('/api/classes/schedule'), {
           headers: { Authorization: `Bearer ${getToken()}` }
         })
       ]);
@@ -115,7 +116,7 @@ const EditClassSchedule = () => {
     // Create subject via API
     setCreatingTeacher(true); // Reusing state for subject creation
     axios.post(
-      'http://localhost:8000/api/subjects',
+      apiUrl('/api/subjects'),
       newSubject,
       { headers: { Authorization: `Bearer ${getToken()}` } }
     )
@@ -163,7 +164,7 @@ const EditClassSchedule = () => {
     setUpdatingSubject(true);
     try {
       const res = await axios.put(
-        `http://localhost:8000/api/subjects/${editingSubject.subjectId}`,
+        apiUrl(`/api/subjects/${editingSubject.subjectId}`),
         {
           name: editingSubject.name,
           form: editingSubject.form,
@@ -211,7 +212,7 @@ const EditClassSchedule = () => {
     setCreatingTeacher(true);
     try {
       const res = await axios.post(
-        'http://localhost:8000/api/teachers',
+        apiUrl('/api/teachers'),
         newTeacher,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
@@ -240,7 +241,7 @@ const EditClassSchedule = () => {
     setLoading(true);
     try {
       const res = await axios.put(
-        `http://localhost:8000/api/classes/schedule/${classId}`,
+        apiUrl(`/api/classes/schedule/${classId}`),
         {
           classDay: values.classDay,
           startTime: values.timeRange[0].format('HH:mm:ss'),
@@ -417,15 +418,28 @@ const EditClassSchedule = () => {
                     >
                       {subjects.map(s => (
                         <Option key={s.subjectId} value={s.subjectId}>
-                          <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <Space>
                               <BookOutlined />
-                              <span>{s.name} - {s.form}</span>
+                              <span style={{ fontWeight: 500 }}>{s.name} - {s.form}</span>
                             </Space>
-                            {/* <div style={{ fontSize: '12px', color: '#52c41a' }}>
-                              Fee: RM {s.subjectFee?.toFixed(2) || '0.00'}
-                            </div> */}
-                          </Space>
+                            {s.classes && s.classes.length > 0 && (
+                              <div style={{ paddingLeft: 20 }}>
+                                {s.classes.map(cls => (
+                                  <div key={cls.classId} style={{ fontSize: '12px', color: '#888', lineHeight: '18px' }}>
+                                    • {cls.classDay} {cls.startTime}–{cls.finishTime}
+                                    {cls.location ? ` · ${cls.location}` : ''}
+                                    {cls.teacherName ? ` · ${cls.teacherName}` : ''}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {(!s.classes || s.classes.length === 0) && (
+                              <div style={{ paddingLeft: 20, fontSize: '12px', color: '#bbb', fontStyle: 'italic' }}>
+                                No classes yet
+                              </div>
+                            )}
+                          </div>
                         </Option>
                       ))}
                     </Select>

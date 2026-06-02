@@ -9,6 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getToken, getUser } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 
 const { Title, Text } = Typography;
 
@@ -22,7 +23,7 @@ const StaffClasses = () => {
   const fetchMyClasses = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:8000/api/study-materials/my-classes', {
+      const res = await axios.get(apiUrl('/api/study-materials/my-classes'), {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       if (res.data.success) {

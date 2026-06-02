@@ -1,10 +1,11 @@
-// src/Pages/EditUser.js
+// src/Pages/EditUser.js - Fixed version with proper fee calculation
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card, Input, Select, Button, message, Checkbox, Spin } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { getToken } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 
 const { Option } = Select;
 
@@ -21,6 +22,8 @@ const EditUser = () => {
   const [fetchingClasses, setFetchingClasses] = useState(false);
   const [registrationLoaded, setRegistrationLoaded] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [passwordValid, setPasswordValid] = useState(true);
+  const [passwordErrors, setPasswordErrors] = useState([]);
 
   const [form, setForm] = useState({
     name: '',
@@ -29,7 +32,7 @@ const EditUser = () => {
     phone: '',
     address: '',
     role: 'Staff',
-    monthlyFee: 200
+    monthlyFee: 0
   });
 
   useEffect(() => {
@@ -43,30 +46,94 @@ const EditUser = () => {
     loadData();
   }, [userType, userId]);
 
-  // Update selectedSubjects whenever selectedClasses, classes, or subjects change
+  // Recalculate fee whenever selectedClasses or subjects/classes data changes
   useEffect(() => {
     if (selectedClasses.length > 0 && classes.length > 0 && subjects.length > 0 && registrationLoaded) {
-      // Get the selected class objects
-      const selectedClassesData = classes.filter(c => 
-        selectedClasses.includes(c.classId)
-      );
+      calculateMonthlyFee(selectedClasses);
       
-      console.log('Selected classes data:', selectedClassesData);
+      // Get the selected class objects to determine which subjects are selected
+      const selectedClassesData = classes.filter(c => selectedClasses.includes(c.classId));
       
       // Find subjects that match by subjectName
-      const subjectNames = [...new Set(
-        selectedClassesData.map(c => c.subjectName)
-      )];
+      const subjectNames = [...new Set(selectedClassesData.map(c => c.subjectName))];
       
       // Find subject IDs that match these names
       const subjectIds = subjects
         .filter(s => subjectNames.includes(s.name))
         .map(s => s.subjectId || s.id);
       
-      console.log('Setting selected subjects:', subjectIds);
       setSelectedSubjects(subjectIds);
     }
   }, [selectedClasses, classes, subjects, registrationLoaded]);
+
+  const calculateMonthlyFee = (classIds) => {
+    console.log('=== CALCULATING MONTHLY FEE (Edit) ===');
+    console.log('Class IDs selected:', classIds);
+    
+    if (!classIds || classIds.length === 0) {
+      setForm(prev => ({ ...prev, monthlyFee: 0 }));
+      return 0;
+    }
+    
+    let total = 0;
+    
+    // Find selected class objects
+    const selectedClassObjects = classes.filter(c => classIds.includes(c.classId));
+    console.log('Selected class objects:', selectedClassObjects);
+    
+    // Method 1: Check if classes have subjectFee directly
+    if (selectedClassObjects.length > 0 && selectedClassObjects[0].subjectFee !== undefined) {
+      total = selectedClassObjects.reduce((sum, c) => sum + (parseFloat(c.subjectFee) || 0), 0);
+      console.log('Total from direct subjectFee:', total);
+    } 
+    // Method 2: Match by subjectName to get fee from subjects array
+    else if (selectedClassObjects.length > 0) {
+      const selectedSubjectNames = [...new Set(selectedClassObjects.map(c => c.subjectName))];
+      console.log('Selected subject names:', selectedSubjectNames);
+      
+      total = subjects
+        .filter(s => selectedSubjectNames.includes(s.name))
+        .reduce((sum, s) => sum + (parseFloat(s.subjectFee) || 0), 0);
+      console.log('Total from subjects lookup:', total);
+    }
+    // Method 3: Use class's subjectId if available
+    else if (selectedClassObjects.length > 0 && selectedClassObjects[0].subjectId) {
+      const selectedSubjectIds = [...new Set(selectedClassObjects.map(c => c.subjectId))];
+      total = subjects
+        .filter(s => selectedSubjectIds.includes(s.subjectId))
+        .reduce((sum, s) => sum + (parseFloat(s.subjectFee) || 0), 0);
+      console.log('Total from subjectId lookup:', total);
+    }
+    
+    setForm(prev => ({ ...prev, monthlyFee: total }));
+    return total;
+  };
+
+  const validatePassword = (password) => {
+    const errors = [];
+    
+    if (password && password.length > 0) {
+      if (password.length < 6) {
+        errors.push('Password must be at least 6 characters');
+      }
+      if (!/\d/.test(password)) {
+        errors.push('Password must contain at least one number');
+      }
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) {
+        errors.push('Password must contain at least one symbol');
+      }
+    }
+    
+    setPasswordErrors(errors);
+    setPasswordValid(errors.length === 0);
+    return errors.length === 0;
+  };
+
+  const handlePasswordChange = (e) => {
+    const value = e.target.value;
+    setForm({ ...form, password: value });
+    validatePassword(value);
+  };
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -92,7 +159,7 @@ const EditUser = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/users/${userType}/${userId}`,
+        apiUrl(`/api/users/${userType}/${userId}`),
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
@@ -111,7 +178,6 @@ const EditUser = () => {
         // Add student-specific fields only if user is a student
         if (userType === 'student') {
           formData.address = user.address || '';
-          formData.monthlyFee = user.monthlyFee || 200;
         }
 
         setForm(formData);
@@ -137,16 +203,13 @@ const EditUser = () => {
   const fetchStudentRegistration = async (studentId) => {
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/users/student/${studentId}/registration`,
+        apiUrl(`/api/users/student/${studentId}/registration`),
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
       if (res.data.success && res.data.data) {
         const registration = res.data.data;
-        setForm(prev => ({
-          ...prev,
-          monthlyFee: registration.monthlyFee || 200
-        }));
+        // Don't set monthlyFee from registration - it will be calculated from classes
 
         // Parse classIds
         if (registration.classIds) {
@@ -164,10 +227,9 @@ const EditUser = () => {
   const fetchAllClasses = async () => {
     setFetchingClasses(true);
     try {
-      const res = await axios.get('http://localhost:8000/api/classes');
+      const res = await axios.get(apiUrl('/api/classes'));
       console.log('All classes response:', res.data);
       
-      // Handle different response structures
       let classesData = [];
       if (Array.isArray(res.data)) {
         classesData = res.data;
@@ -178,6 +240,7 @@ const EditUser = () => {
         classesData = [];
       }
       
+      console.log('Processed classes data:', classesData);
       setClasses(classesData);
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -190,10 +253,9 @@ const EditUser = () => {
   const fetchSubjects = async () => {
     setFetchingSubjects(true);
     try {
-      const res = await axios.get('http://localhost:8000/api/subjects');
+      const res = await axios.get(apiUrl('/api/subjects'));
       console.log('Subjects API response:', res.data);
       
-      // Handle the response structure
       let subjectsData = [];
       if (res.data.success && Array.isArray(res.data.data)) {
         subjectsData = res.data.data;
@@ -227,25 +289,32 @@ const EditUser = () => {
         .filter(c => c.subjectName === subjectName)
         .map(c => c.classId);
       
-      setSelectedClasses(selectedClasses.filter(id => !classesToRemove.includes(id)));
+      const newSelectedClasses = selectedClasses.filter(id => !classesToRemove.includes(id));
+      setSelectedClasses(newSelectedClasses);
+      calculateMonthlyFee(newSelectedClasses);
     } else {
-      // Add subject
       setSelectedSubjects([...selectedSubjects, subjectId]);
     }
   };
 
   const handleClassChange = (classId) => {
-    if (selectedClasses.includes(classId)) {
-      setSelectedClasses(selectedClasses.filter(id => id !== classId));
-    } else {
-      setSelectedClasses([...selectedClasses, classId]);
-    }
+    const newSelectedClasses = selectedClasses.includes(classId)
+      ? selectedClasses.filter(id => id !== classId)
+      : [...selectedClasses, classId];
+    setSelectedClasses(newSelectedClasses);
+    calculateMonthlyFee(newSelectedClasses);
   };
 
   const handleSubmit = async () => {
     // Validation
     if (!form.name || !form.email || !form.phone) {
       message.error('Please fill in all required fields');
+      return;
+    }
+
+    // Validate password only if provided
+    if (form.password && !validatePassword(form.password)) {
+      message.error('Password does not meet requirements:\n' + passwordErrors.join('\n'));
       return;
     }
 
@@ -295,7 +364,7 @@ const EditUser = () => {
       console.log('Submitting payload:', payload);
 
       const res = await axios.put(
-        `http://localhost:8000/api/users/${userType}/${userId}`,
+        apiUrl(`/api/users/${userType}/${userId}`),
         payload,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
@@ -307,7 +376,6 @@ const EditUser = () => {
     } catch (error) {
       console.error('Error:', error);
       
-      // Better error handling to show validation errors
       if (error.response?.status === 422) {
         const errors = error.response.data.errors;
         const errorMessages = Object.values(errors).flat().join('\n');
@@ -378,6 +446,20 @@ const EditUser = () => {
       color: '#ff4d4f',
       fontSize: 12,
       marginTop: 4
+    },
+    passwordHint: {
+      fontSize: 12,
+      color: '#666',
+      marginTop: 4,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2
+    },
+    hintValid: {
+      color: '#52c41a'
+    },
+    hintInvalid: {
+      color: '#ff4d4f'
     }
   };
 
@@ -464,10 +546,24 @@ const EditUser = () => {
           </div>
           <Input.Password
             value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder="Enter new password"
+            onChange={handlePasswordChange}
+            placeholder="Enter new password (min 6 characters, 1 digit, 1 symbol)"
             size="large"
+            status={!passwordValid && form.password ? 'error' : ''}
           />
+          {form.password && (
+            <div style={styles.passwordHint}>
+              <div style={form.password.length >= 6 ? styles.hintValid : styles.hintInvalid}>
+                {form.password.length >= 6 ? '✓' : '✗'} At least 6 characters
+              </div>
+              <div style={/\d/.test(form.password) ? styles.hintValid : styles.hintInvalid}>
+                {/\d/.test(form.password) ? '✓' : '✗'} At least 1 number
+              </div>
+              <div style={/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(form.password) ? styles.hintValid : styles.hintInvalid}>
+                {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(form.password) ? '✓' : '✗'} At least 1 symbol
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Phone */}
@@ -500,18 +596,24 @@ const EditUser = () => {
               />
             </div>
 
-            {/* Monthly Fee */}
+            {/* Monthly Fee - auto calculated */}
             <div style={styles.formGroup}>
               <div style={styles.label}>
-                Monthly Fee (RM) <span style={styles.required}>*</span>
+                Monthly Fee (RM) <span style={{ color: '#666', fontWeight: 400 }}>(Auto-calculated)</span>
               </div>
               <Input
                 type="number"
                 value={form.monthlyFee}
-                onChange={(e) => setForm({ ...form, monthlyFee: parseFloat(e.target.value) })}
+                readOnly
                 size="large"
                 prefix="RM"
+                style={{ background: '#f5f5f5', color: '#3b1fa3', fontWeight: 600, cursor: 'not-allowed' }}
               />
+              <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                {selectedClasses.length === 0
+                  ? 'Select classes above to calculate fee automatically'
+                  : `Total fee for ${selectedClasses.length} selected class(es)`}
+              </div>
             </div>
 
             {/* Subject and Class Selection */}
@@ -543,6 +645,11 @@ const EditUser = () => {
                           style={{ fontWeight: 600, fontSize: 16, marginBottom: 12 }}
                         >
                           {subject.name} {subject.form ? `(${subject.form})` : ''}
+                          {subject.subjectFee > 0 && (
+                            <span style={{ marginLeft: 8, color: '#52c41a', fontSize: 12 }}>
+                              (RM {parseFloat(subject.subjectFee).toFixed(2)})
+                            </span>
+                          )}
                         </Checkbox>
 
                         {selectedSubjects.includes(subjectId) && (

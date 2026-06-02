@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Hash;
 class ClassScheduleController extends Controller
 {
 
-        /**
+    /**
      * GET /api/classes/schedule/public
      * Get all classes for public viewing (no authentication required)
      * Shows seat availability for public
@@ -19,9 +19,12 @@ class ClassScheduleController extends Controller
     public function getPublicClasses()
     {
         try {
+            $currentYear = date('Y');
+
             $classes = DB::table('class')
                 ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                 ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
+                ->where('class.academicYear', $currentYear)
                 ->select(
                     'class.classId',
                     'class.classDay',
@@ -29,8 +32,10 @@ class ClassScheduleController extends Controller
                     'class.finishTime',
                     'class.location',
                     'class.availability',
+                    'class.academicYear',
                     'subject.name as subjectName',
                     'subject.form',
+                    'subject.subjectFee',
                     'authority.name as teacherName'
                 )
                 ->orderBy('class.classDay')
@@ -39,30 +44,31 @@ class ClassScheduleController extends Controller
                 ->map(function ($c) {
                     $c->startTime = date('H:i', strtotime($c->startTime));
                     $c->finishTime = date('H:i', strtotime($c->finishTime));
-                    
+
                     // Calculate current enrolled students for public view too
                     $enrolledStudents = DB::table('registration')
                         ->select('studentId')
                         ->where('status', 'Approved')
-                        ->where(function($query) use ($c) {
-                            $query->where('classId', $c->classId)
-                                  ->orWhereRaw('FIND_IN_SET(?, classIds)', [$c->classId]);
-                        })
+                        ->where('enrollmentYear', $c->academicYear)
+                        ->where(function ($query) use ($c) {
+                        $query->where('classId', $c->classId)
+                            ->orWhereRaw('FIND_IN_SET(?, classIds)', [$c->classId]);
+                    })
                         ->distinct()
                         ->pluck('studentId');
-                    
+
                     $enrolledCount = $enrolledStudents->count();
                     $c->enrolledStudents = $enrolledCount;
                     $c->availableSpaces = max(0, $c->availability - $enrolledCount);
-                    
+
                     return $c;
                 });
- 
+
             return response()->json([
                 'success' => true,
                 'data' => $classes
             ], 200);
- 
+
         } catch (\Exception $e) {
             Log::error('getPublicClasses failed: ' . $e->getMessage());
             return response()->json([
@@ -72,17 +78,20 @@ class ClassScheduleController extends Controller
         }
     }
 
-        /**
+    /**
      * GET /api/classes/by-subject/{subjectId}
      * Get classes for a specific subject (public endpoint for registration)
      */
     public function getClassesBySubject($subjectId)
     {
         try {
+            $currentYear = date('Y');
+
             $classes = DB::table('class')
                 ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                 ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
                 ->where('class.subjectId', $subjectId)
+                ->where('class.academicYear', $currentYear)
                 ->select(
                     'class.classId',
                     'class.classDay',
@@ -90,6 +99,7 @@ class ClassScheduleController extends Controller
                     'class.finishTime',
                     'class.location',
                     'class.availability',
+                    'class.academicYear',
                     'subject.name as subjectName',
                     'subject.form',
                     'authority.name as teacher'
@@ -100,30 +110,31 @@ class ClassScheduleController extends Controller
                 ->map(function ($c) {
                     $c->startTime = date('H:i', strtotime($c->startTime));
                     $c->finishTime = date('H:i', strtotime($c->finishTime));
-                    
-                    // Calculate available seats
+
+                    // Calculate available seats using the class's academic year
                     $enrolledStudents = DB::table('registration')
                         ->select('studentId')
                         ->where('status', 'Approved')
-                        ->where(function($query) use ($c) {
-                            $query->where('classId', $c->classId)
-                                  ->orWhereRaw('FIND_IN_SET(?, classIds)', [$c->classId]);
-                        })
+                        ->where('enrollmentYear', $c->academicYear)  // ← FIXED: use class's academic year
+                        ->where(function ($query) use ($c) {
+                        $query->where('classId', $c->classId)
+                            ->orWhereRaw('FIND_IN_SET(?, classIds)', [$c->classId]);
+                    })
                         ->distinct()
                         ->pluck('studentId');
-                    
+
                     $enrolledCount = $enrolledStudents->count();
                     $c->enrolledStudents = $enrolledCount;
                     $c->availableSpaces = max(0, $c->availability - $enrolledCount);
-                    
+
                     return $c;
                 });
- 
+
             return response()->json([
                 'success' => true,
                 'data' => $classes
             ], 200);
- 
+
         } catch (\Exception $e) {
             Log::error('getClassesBySubject failed: ' . $e->getMessage());
             return response()->json([
@@ -136,13 +147,18 @@ class ClassScheduleController extends Controller
     /**
      * GET /api/classes/schedule
      * Get all classes with subject and teacher details + availability
+     * Accepts year parameter for filtering
      */
-    public function getAllClasses()
+    public function getAllClasses(Request $request)
     {
         try {
+            $currentYear = date('Y');
+            $year = $request->query('year', $currentYear);
+
             $classes = DB::table('class')
                 ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                 ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
+                ->where('class.academicYear', $year)
                 ->select(
                     'class.classId',
                     'class.classDay',
@@ -150,61 +166,49 @@ class ClassScheduleController extends Controller
                     'class.finishTime',
                     'class.location',
                     'class.availability',
-                    'class.authorityId',
+                    'class.academicYear',
                     'class.subjectId',
+                    'class.authorityId',
                     'subject.name as subjectName',
                     'subject.form',
                     'subject.subjectFee',
                     'authority.name as teacherName'
                 )
-                ->orderBy('class.classDay')
-                ->orderBy('class.startTime')
-                ->get()
-                ->map(function ($c) {
-                    $c->startTime = date('H:i', strtotime($c->startTime));
-                    $c->finishTime = date('H:i', strtotime($c->finishTime));
-                    
-                    // Calculate current enrolled students (APPROVED ONLY)
-                    // Method 1: Using subquery approach for better debugging
-                    $enrolledStudents = DB::table('registration')
-                        ->select('studentId')
-                        ->where('status', 'Approved')
-                        ->where(function($query) use ($c) {
-                            $query->where('classId', $c->classId)
-                                  ->orWhereRaw('FIND_IN_SET(?, classIds)', [$c->classId]);
-                        })
-                        ->distinct()
-                        ->pluck('studentId');
-                    
-                    $enrolledCount = $enrolledStudents->count();
-                    
-                    // Debug logging for class 1
-                    if ($c->classId == 1) {
-                        Log::info('Class 1 Enrollment Debug', [
-                            'classId' => $c->classId,
-                            'enrolledStudentIds' => $enrolledStudents->toArray(),
-                            'enrolledCount' => $enrolledCount,
-                            'availability' => $c->availability,
-                            'availableSpaces' => max(0, $c->availability - $enrolledCount)
-                        ]);
-                    }
-                    
-                    $c->enrolledStudents = $enrolledCount;
-                    $c->availableSpaces = max(0, $c->availability - $enrolledCount);
-                    
-                    return $c;
-                });
- 
+                ->get();
+
+            $classes = $classes->map(function ($class) use ($year) {
+                $class->startTime = date('H:i', strtotime($class->startTime));
+                $class->finishTime = date('H:i', strtotime($class->finishTime));
+
+                // Calculate enrolled students for this specific year
+                $enrolledCount = DB::table('registration')
+                    ->where('status', 'Approved')
+                    ->where('enrollmentYear', $year)
+                    ->where(function ($query) use ($class) {
+                        $query->where('classId', $class->classId)
+                            ->orWhereRaw('FIND_IN_SET(?, classIds)', [$class->classId]);
+                    })
+                    ->distinct()
+                    ->count('studentId');
+
+                $class->enrolledStudents = $enrolledCount;
+                $class->availableSpaces = max(0, $class->availability - $enrolledCount);
+
+                return $class;
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => $classes
-            ], 200);
- 
+                'data' => $classes,
+                'academic_year' => $year,
+                'current_year' => $currentYear
+            ]);
+
         } catch (\Exception $e) {
             Log::error('getAllClasses failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to load classes'
+                'message' => 'Failed to fetch classes: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -231,6 +235,60 @@ class ClassScheduleController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch subjects'
+            ], 500);
+        }
+    }
+
+    /**
+     * GET /api/subjects/with-classes
+     * Get all subjects with their existing classes for the current year
+     */
+    public function getSubjectsWithClasses()
+    {
+        try {
+            $currentYear = date('Y');
+
+            $subjects = DB::table('subject')
+                ->orderBy('form')
+                ->orderBy('name')
+                ->get();
+
+            $subjects = $subjects->map(function ($subject) use ($currentYear) {
+                $classes = DB::table('class')
+                    ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
+                    ->where('class.subjectId', $subject->subjectId)
+                    ->where('class.academicYear', $currentYear)
+                    ->select(
+                        'class.classId',
+                        'class.classDay',
+                        'class.startTime',
+                        'class.finishTime',
+                        'class.location',
+                        'authority.name as teacherName'
+                    )
+                    ->orderBy('class.classDay')
+                    ->orderBy('class.startTime')
+                    ->get()
+                    ->map(function ($c) {
+                        $c->startTime = date('H:i', strtotime($c->startTime));
+                        $c->finishTime = date('H:i', strtotime($c->finishTime));
+                        return $c;
+                    });
+
+                $subject->classes = $classes;
+                return $subject;
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $subjects
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('getSubjectsWithClasses failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch subjects with classes'
             ], 500);
         }
     }
@@ -280,8 +338,8 @@ class ClassScheduleController extends Controller
                 'success' => true,
                 'message' => 'Subject created successfully',
                 'data' => [
-                    'subjectId' => $subjectId, 
-                    'name' => $request->name, 
+                    'subjectId' => $subjectId,
+                    'name' => $request->name,
                     'form' => $request->form,
                     'subjectFee' => $request->subjectFee
                 ]
@@ -351,7 +409,7 @@ class ClassScheduleController extends Controller
                 'success' => true,
                 'message' => 'Subject updated successfully',
                 'data' => [
-                    'subjectId' => (int)$subjectId,
+                    'subjectId' => (int) $subjectId,
                     'name' => $request->name,
                     'form' => $request->form,
                     'subjectFee' => $request->subjectFee
@@ -584,6 +642,7 @@ class ClassScheduleController extends Controller
         DB::beginTransaction();
         try {
             $subjectId = $request->subjectId;
+            $currentYear = date('Y'); // Get current year
 
             // If new subject data is provided, create the subject first
             if ($request->has('newSubject') && !empty($request->newSubject['name'])) {
@@ -614,6 +673,7 @@ class ClassScheduleController extends Controller
                 ], 422);
             }
 
+            // IMPORTANT: Add academicYear to the insert
             $classId = DB::table('class')->insertGetId([
                 'classDay' => $request->classDay,
                 'startTime' => $request->startTime,
@@ -622,11 +682,12 @@ class ClassScheduleController extends Controller
                 'availability' => $request->availability,
                 'authorityId' => $request->authorityId,
                 'subjectId' => $subjectId,
+                'academicYear' => $currentYear, // ← ADD THIS LINE
             ]);
 
             DB::commit();
 
-            Log::info('Class created', ['classId' => $classId]);
+            Log::info('Class created', ['classId' => $classId, 'academicYear' => $currentYear]);
 
             return response()->json([
                 'success' => true,
@@ -639,7 +700,7 @@ class ClassScheduleController extends Controller
             Log::error('createClass failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create class'
+                'message' => 'Failed to create class: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -747,6 +808,42 @@ class ClassScheduleController extends Controller
                 'success' => false,
                 'message' => 'Failed to delete class'
             ], 500);
+        }
+    }
+
+    /**
+     * GET /api/classes/available-years
+     * Get available years from classes table
+     */
+    public function getAvailableYears()
+    {
+        try {
+            $years = DB::table('class')
+                ->select('academicYear')
+                ->distinct()
+                ->orderBy('academicYear', 'desc')
+                ->pluck('academicYear')
+                ->toArray();
+
+            // Add current year if not present
+            $currentYear = date('Y');
+            if (!in_array($currentYear, $years)) {
+                array_unshift($years, $currentYear);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $years,
+                'current_year' => $currentYear
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('getAvailableYears failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'data' => [date('Y')],
+                'current_year' => date('Y')
+            ]);
         }
     }
 }

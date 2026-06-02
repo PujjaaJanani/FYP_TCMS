@@ -8,7 +8,7 @@ import './App.css';
 const App = () => {
   return (
     <Router>
-      <Layout style={{ minHeight: '100vh' }}>
+      <Layout style={{ height: '100vh', overflow: 'hidden' }}>
         <ContentArea />
       </Layout>
     </Router>

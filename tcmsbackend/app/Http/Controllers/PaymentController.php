@@ -350,8 +350,8 @@ class PaymentController extends Controller
                 'billPayorInfo' => 1,
                 'billAmount' => number_format($effectiveAmount, 2, '.', '') * 100,
                 'billReturnUrl' => $isParent
-                    ? "http://localhost:3000/parent/payment?payment_id={$paymentRecord->paymentId}"
-                    : "http://localhost:3000/student/payment?payment_id={$paymentRecord->paymentId}",
+                    ? config('app.frontend_url') . "/parent/payment?payment_id={$paymentRecord->paymentId}"
+                    : config('app.frontend_url') . "/student/payment?payment_id={$paymentRecord->paymentId}",
                 'billCallbackUrl' => 'http://localhost:8000/api/payments/toyyibpay/callback',
                 'billExternalReferenceNo' => 'PAY' . $paymentRecord->paymentId,
                 'billTo' => $student->name,

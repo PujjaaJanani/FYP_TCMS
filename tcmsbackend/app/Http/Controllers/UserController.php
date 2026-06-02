@@ -15,16 +15,17 @@ use Illuminate\Support\Facades\Hash;
 class UserController extends Controller
 {
     /**
-     * Get all users (Authorities + Approved Students)
+     * Get all users (Authorities + Approved Students) with optional year filter
      */
     public function getAllUsers(Request $request)
     {
         try {
             $userType = $request->query('type', 'all'); // all, authorities, students
+            $year = $request->query('year', date('Y')); // Filter by year, default current year
 
             $users = [];
 
-            // Get all authorities
+            // Get all authorities (always show, independent of year)
             if ($userType === 'all' || $userType === 'authorities') {
                 $authorities = Authority::select(
                     'authorityId as id',
@@ -33,17 +34,19 @@ class UserController extends Controller
                     'phone as contactNumber',
                     DB::raw("'' as address"),
                     'role',
-                    DB::raw("'authority' as userType")
+                    DB::raw("'authority' as userType"),
+                    DB::raw("NULL as enrollmentYear")
                 )->get();
 
                 $users = array_merge($users, $authorities->toArray());
             }
 
-            // Get approved students only
+            // Get approved students for specific year
             if ($userType === 'all' || $userType === 'students') {
                 $students = DB::table('student')
                     ->join('registration', 'student.studentId', '=', 'registration.studentId')
                     ->where('registration.status', 'Approved')
+                    ->where('registration.enrollmentYear', $year)
                     ->select(
                         'student.studentId as id',
                         'student.name',
@@ -51,7 +54,8 @@ class UserController extends Controller
                         'student.phone as contactNumber',
                         'student.address',
                         DB::raw("'Student' as role"),
-                        DB::raw("'student' as userType")
+                        DB::raw("'student' as userType"),
+                        'registration.enrollmentYear'
                     )
                     ->distinct()
                     ->get();
@@ -61,7 +65,9 @@ class UserController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $users
+                'data' => $users,
+                'current_year' => date('Y'),
+                'available_years' => $this->getAvailableYears()
             ]);
 
         } catch (\Exception $e) {
@@ -74,11 +80,50 @@ class UserController extends Controller
     }
 
     /**
+     * Get available years from registration table
+     */
+    public function getAvailableYears()
+    {
+        try {
+            $years = DB::table('registration')
+                ->select('enrollmentYear')
+                ->where('status', 'Approved')
+                ->distinct()
+                ->orderBy('enrollmentYear', 'desc')
+                ->pluck('enrollmentYear')
+                ->toArray();
+
+            // Add current year if not present
+            $currentYear = date('Y');
+            if (!in_array($currentYear, $years)) {
+                array_unshift($years, $currentYear);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $years,
+                'current_year' => $currentYear
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('getAvailableYears failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'data' => [date('Y')],
+                'current_year' => date('Y')
+            ]);
+        }
+    }
+
+    /**
      * Get single user (Authority or Student)
+     * Students can only be viewed if they have registration for current year
      */
     public function getUser($userType, $id)
     {
         try {
+            $currentYear = date('Y');
+            
             if ($userType === 'authority') {
                 $user = Authority::find($id);
                 if ($user) {
@@ -88,6 +133,19 @@ class UserController extends Controller
             } else {
                 $user = Student::find($id);
                 if ($user) {
+                    // Check if student has registration for current year
+                    $hasCurrentYearRegistration = Registration::where('studentId', $id)
+                        ->where('enrollmentYear', $currentYear)
+                        ->where('status', 'Approved')
+                        ->exists();
+                    
+                    if (!$hasCurrentYearRegistration) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Student not enrolled for current year'
+                        ], 403);
+                    }
+                    
                     $user->userType = 'student';
                     $user->contactNumber = $user->phone;
                 }
@@ -116,9 +174,12 @@ class UserController extends Controller
 
     /**
      * Create new user (Authority or Student)
+     * Only for current year
      */
     public function createUser(Request $request)
     {
+        $currentYear = date('Y');
+        
         $validator = Validator::make($request->all(), [
             'userType' => 'required|in:authority,student',
             'name' => 'required|string|max:100',
@@ -176,7 +237,7 @@ class UserController extends Controller
                     'address' => $request->address
                 ]);
 
-                // Create approved registration with selected classes
+                // Create approved registration for CURRENT YEAR only
                 $classIds = $request->classIds;
                 $classIdsString = implode(',', $classIds);
                 $firstClassId = $classIds[0];
@@ -187,6 +248,7 @@ class UserController extends Controller
                     'classIds' => $classIdsString,
                     'status' => 'Approved',
                     'createdAt' => now(),
+                    'enrollmentYear' => $currentYear,
                     'monthlyFee' => $request->monthlyFee ?? 200.00
                 ]);
 
@@ -213,9 +275,12 @@ class UserController extends Controller
 
     /**
      * Update user
+     * Students can only be updated for current year
      */
     public function updateUser(Request $request, $userType, $id)
     {
+        $currentYear = date('Y');
+        
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'email' => 'required|email|max:100',
@@ -272,6 +337,19 @@ class UserController extends Controller
                     ], 404);
                 }
 
+                // Check if student has registration for current year
+                $hasCurrentYearRegistration = Registration::where('studentId', $id)
+                    ->where('enrollmentYear', $currentYear)
+                    ->where('status', 'Approved')
+                    ->exists();
+                
+                if (!$hasCurrentYearRegistration) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cannot edit: Student not enrolled for current year'
+                    ], 403);
+                }
+
                 // Check email uniqueness
                 if (Student::where('email', $request->email)->where('studentId', '!=', $id)->exists()) {
                     return response()->json([
@@ -289,8 +367,9 @@ class UserController extends Controller
                     $user->password = Hash::make($request->password);
                 }
 
-                // Update registration
+                // Update registration for current year
                 $registration = Registration::where('studentId', $id)
+                    ->where('enrollmentYear', $currentYear)
                     ->where('status', 'Approved')
                     ->first();
 
@@ -327,9 +406,12 @@ class UserController extends Controller
 
     /**
      * Delete user
+     * Students can only be deleted for current year
      */
     public function deleteUser($userType, $id)
     {
+        $currentYear = date('Y');
+        
         try {
             DB::beginTransaction();
 
@@ -361,9 +443,53 @@ class UserController extends Controller
                     ], 404);
                 }
 
-                // Delete related registrations
-                Registration::where('studentId', $id)->delete();
+                // Only allow deletion of current year students
+                $hasCurrentYearRegistration = Registration::where('studentId', $id)
+                    ->where('enrollmentYear', $currentYear)
+                    ->where('status', 'Approved')
+                    ->exists();
                 
+                if (!$hasCurrentYearRegistration) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cannot delete past year records'
+                    ], 403);
+                }
+
+                // Get registration IDs for current year only
+                $registrationIds = DB::table('registration')
+                    ->where('studentId', $id)
+                    ->where('enrollmentYear', $currentYear)
+                    ->pluck('registrationId');
+
+                // 1. Delete attendance records
+                DB::table('attendance')
+                    ->whereIn('registrationId', $registrationIds)
+                    ->delete();
+
+                // 2. Delete test marks
+                DB::table('testmark')
+                    ->whereIn('registrationId', $registrationIds)
+                    ->delete();
+
+                // 3. Delete payments
+                DB::table('payment')
+                    ->whereIn('registrationId', $registrationIds)
+                    ->delete();
+
+                // 4. Delete registration
+                DB::table('registration')
+                    ->where('studentId', $id)
+                    ->where('enrollmentYear', $currentYear)
+                    ->delete();
+
+                // 5. Delete personal access tokens
+                DB::table('personal_access_tokens')
+                    ->where('tokenable_type', 'App\\Models\\Student')
+                    ->where('tokenable_id', $id)
+                    ->delete();
+
+                // 6. Delete the student
                 $user->delete();
             }
 
@@ -390,14 +516,17 @@ class UserController extends Controller
     public function getStudentRegistration($studentId)
     {
         try {
+            $currentYear = date('Y');
+            
             $registration = Registration::where('studentId', $studentId)
+                ->where('enrollmentYear', $currentYear)
                 ->where('status', 'Approved')
                 ->first();
 
             if (!$registration) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Registration not found'
+                    'message' => 'Registration not found for current year'
                 ], 404);
             }
 

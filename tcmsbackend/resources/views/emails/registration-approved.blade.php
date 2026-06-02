@@ -135,7 +135,7 @@
                 <p>You can now log in to your student portal to access class materials, schedules, and more.</p>
             </div>
 
-            <a href="http://localhost:3000/login" class="cta-button" style="color: #ffffff !important;">Login to Student Portal</a>
+            <a href="{{ config('app.frontend_url') }}/login" class="cta-button" style="color: #ffffff !important;">Login to Student Portal</a>
         </div>
 
         <!-- Footer -->

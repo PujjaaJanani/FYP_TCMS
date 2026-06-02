@@ -17,6 +17,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { getToken } from "../Utils/LocalStorage";
 import dayjs from "dayjs";
+import { apiUrl } from "../api";
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -46,10 +47,10 @@ const PastClassAcademicView = () => {
     try {
       console.log('Fetching materials for archive:', { classId, academicYear });
       const [matRes, testRes] = await Promise.all([
-        axios.get(`http://localhost:8000/api/study-materials/class/${classId}?academicYear=${academicYear}`, {
+        axios.get(apiUrl(`/api/study-materials/class/${classId}?academicYear=${academicYear}`), {
           headers: { Authorization: `Bearer ${getToken()}` },
         }),
-        axios.get(`http://localhost:8000/api/testmarks/class/${classId}?academicYear=${academicYear}`, {
+        axios.get(apiUrl(`/api/testmarks/class/${classId}?academicYear=${academicYear}`), {
           headers: { Authorization: `Bearer ${getToken()}` },
         }),
       ]);
@@ -79,7 +80,7 @@ const PastClassAcademicView = () => {
       window.open(material.fileUrl, '_blank');
     } else if (material.fileUrl) {
       // Open the file directly in a new tab
-      window.open(`http://localhost:8000${material.fileUrl}`, '_blank');
+      window.open(apiUrl(material.fileUrl), '_blank');
     }
   };
 

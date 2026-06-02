@@ -149,7 +149,7 @@
                 Please contact our office for clarification or to discuss alternative class options.
             </div>
 
-            <a href="http://localhost:3000/login" class="cta-button" style="color: #ffffff !important;">Login to Student Portal</a>
+            <a href="{{ config('app.frontend_url') }}/login" class="cta-button" style="color: #ffffff !important;">Login to Student Portal</a>
         </div>
 
         <!-- Footer -->

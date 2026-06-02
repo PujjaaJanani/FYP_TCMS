@@ -32,6 +32,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import { getToken, getUser } from "../Utils/LocalStorage";
 import dayjs from "dayjs";
+import { apiUrl } from "../api";
 
 const { Title, Text } = Typography;
 
@@ -75,7 +76,7 @@ const RecordAttendance = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/attendance/class/${classId}/students`,
+        apiUrl(`/api/attendance/class/${classId}/students`),
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -106,7 +107,7 @@ const RecordAttendance = () => {
     setHistoryLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/attendance/class/${classId}/history`,
+        apiUrl(`/api/attendance/class/${classId}/history`),
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -130,7 +131,7 @@ const RecordAttendance = () => {
 
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/attendance/class/${classId}/date/${date}`,
+        apiUrl(`/api/attendance/class/${classId}/date/${date}`),
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -185,7 +186,7 @@ const RecordAttendance = () => {
       );
 
       const res = await axios.post(
-        "http://localhost:8000/api/attendance/submit",
+        apiUrl('/api/attendance/submit'),
         {
           classId: parseInt(classId),
           authorityId: parseInt(user.id),
@@ -224,7 +225,7 @@ const RecordAttendance = () => {
       onOk: async () => {
         try {
           const res = await axios.delete(
-            `http://localhost:8000/api/attendance/class/${classId}/date/${date}`,
+            apiUrl(`/api/attendance/class/${classId}/date/${date}`),
             { headers: { Authorization: `Bearer ${getToken()}` } },
           );
 
@@ -310,7 +311,7 @@ const RecordAttendance = () => {
       );
 
       const res = await axios.post(
-        "http://localhost:8000/api/attendance/submit",
+        apiUrl('/api/attendance/submit'),
         {
           classId: parseInt(classId),
           authorityId: parseInt(user.id),

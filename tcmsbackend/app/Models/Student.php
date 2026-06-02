@@ -17,6 +17,8 @@ class Student extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'parentEmail',
+        'parentPassword',
         'password',
         'phone',
         'address',
@@ -26,6 +28,7 @@ class Student extends Authenticatable
 
     protected $hidden = [
         'password',
+        'parentPassword',
     ];
 
     // Relationships

@@ -293,6 +293,129 @@ class TestMarkController extends Controller
     }
 
     /**
+     * Get a student's yearly average test mark history for the subject of a given class.
+     * Dynamically finds all years the student was enrolled in a class for the same subject.
+     */
+    public function getStudentHistory($classId, $studentId)
+    {
+        try {
+            // Find the subjectId for the current class
+            $subjectId = DB::table('class')
+                ->where('classId', $classId)
+                ->value('subjectId');
+
+            if (!$subjectId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Class not found'
+                ], 404);
+            }
+
+            // Find all classes that teach the same subject
+            $sameSubjectClassIds = DB::table('class')
+                ->where('subjectId', $subjectId)
+                ->pluck('classId')
+                ->toArray();
+
+            // Find all approved registrations for this student across all years
+            // that include any of the same-subject class IDs
+            $allRegistrations = DB::table('registration')
+                ->where('studentId', $studentId)
+                ->where('status', 'Approved')
+                ->select('registrationId', 'classId', 'classIds', 'enrollmentYear')
+                ->get();
+
+            // Filter registrations that include at least one same-subject class
+            $matchingRegistrations = $allRegistrations->filter(function ($reg) use ($sameSubjectClassIds) {
+                // Check main classId
+                if (in_array($reg->classId, $sameSubjectClassIds)) return true;
+                // Check comma-separated classIds
+                if ($reg->classIds) {
+                    $ids = array_map('trim', explode(',', $reg->classIds));
+                    foreach ($ids as $id) {
+                        if (in_array((int)$id, $sameSubjectClassIds)) return true;
+                    }
+                }
+                return false;
+            });
+
+            if ($matchingRegistrations->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'hasHistory' => false,
+                    'message' => 'This student has not registered for this subject in any year.'
+                ]);
+            }
+
+            // For each matching registration, calculate the average mark for the same subject
+            $history = [];
+
+            foreach ($matchingRegistrations as $reg) {
+                // Find which of the same-subject class IDs this registration covers
+                $coveredClassIds = [];
+                if (in_array($reg->classId, $sameSubjectClassIds)) {
+                    $coveredClassIds[] = $reg->classId;
+                }
+                if ($reg->classIds) {
+                    $ids = array_map('trim', explode(',', $reg->classIds));
+                    foreach ($ids as $id) {
+                        if (in_array((int)$id, $sameSubjectClassIds)) {
+                            $coveredClassIds[] = (int)$id;
+                        }
+                    }
+                }
+                $coveredClassIds = array_unique($coveredClassIds);
+
+                // Get all test marks for this registration + these class IDs
+                $marks = DB::table('testmark')
+                    ->where('registrationId', $reg->registrationId)
+                    ->whereIn('classId', $coveredClassIds)
+                    ->pluck('mark')
+                    ->toArray();
+
+                if (empty($marks)) continue;
+
+                $average = round(array_sum($marks) / count($marks), 1);
+
+                $history[] = [
+                    'year'    => (int)$reg->enrollmentYear,
+                    'average' => $average,
+                    'total'   => count($marks),
+                ];
+            }
+
+            // Sort by year ascending
+            usort($history, fn($a, $b) => $a['year'] - $b['year']);
+
+            if (empty($history)) {
+                return response()->json([
+                    'success'    => true,
+                    'hasHistory' => false,
+                    'message'    => 'This student has not sat any tests for this subject yet.'
+                ]);
+            }
+
+            // Get subject name for display
+            $subjectName = DB::table('subject')
+                ->where('subjectId', $subjectId)
+                ->value('name');
+
+            return response()->json([
+                'success'     => true,
+                'hasHistory'  => true,
+                'subjectName' => $subjectName,
+                'data'        => $history,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch student history: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Delete an entire test
      */
     public function destroy($classId, $testName, $testDate)

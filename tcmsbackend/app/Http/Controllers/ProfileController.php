@@ -30,6 +30,91 @@ class ProfileController extends Controller
                 ], 401);
             }
 
+            // Parent profile (token created with 'parent' ability)
+            if ($request->user()->tokenCan('parent')) {
+                $currentYear = date('Y');
+                $parentEmail = $user->parentEmail;
+
+                $linkedStudents = Student::where('parentEmail', $parentEmail)->get();
+                $children = [];
+                $grandTotalMonthlyFee = 0;
+
+                foreach ($linkedStudents as $child) {
+                    $registrations = Registration::where('studentId', $child->studentId)
+                        ->where('status', 'Approved')
+                        ->where('enrollmentYear', $currentYear)
+                        ->get();
+
+                    $childClasses = [];
+                    $childTotalMonthlyFee = 0;
+
+                    foreach ($registrations as $registration) {
+                        if (empty($registration->classIds)) {
+                            continue;
+                        }
+
+                        $classIds = array_map('trim', explode(',', $registration->classIds));
+
+                        $classes = DB::table('class')
+                            ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
+                            ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
+                            ->whereIn('class.classId', $classIds)
+                            ->where('class.academicYear', $currentYear)
+                            ->select(
+                                'class.classDay',
+                                'class.startTime',
+                                'class.finishTime',
+                                'class.location',
+                                'subject.name as subjectName',
+                                'subject.form',
+                                'subject.subjectFee',
+                                'authority.name as teacher'
+                            )
+                            ->get();
+
+                        foreach ($classes as $class) {
+                            $childClasses[] = [
+                                'subjectName' => $class->subjectName,
+                                'form' => $class->form,
+                                'classDay' => $class->classDay,
+                                'startTime' => date('H:i', strtotime($class->startTime)),
+                                'finishTime' => date('H:i', strtotime($class->finishTime)),
+                                'location' => $class->location,
+                                'teacher' => $class->teacher,
+                                'subjectFee' => floatval($class->subjectFee),
+                            ];
+                            $childTotalMonthlyFee += floatval($class->subjectFee);
+                        }
+                    }
+
+                    if (!empty($childClasses)) {
+                        $children[] = [
+                            'studentId' => $child->studentId,
+                            'name' => $child->name,
+                            'email' => $child->email,
+                            'phone' => $child->phone,
+                            'address' => $child->address,
+                            'classes' => $childClasses,
+                            'totalMonthlyFee' => $childTotalMonthlyFee,
+                        ];
+                        $grandTotalMonthlyFee += $childTotalMonthlyFee;
+                    }
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'id' => $user->studentId,
+                        'userType' => 'parent',
+                        'parentEmail' => $parentEmail,
+                        'children' => $children,
+                        'linkedChildrenCount' => count($children),
+                        'totalMonthlyFee' => $grandTotalMonthlyFee,
+                        'currentAcademicYear' => $currentYear,
+                    ]
+                ]);
+            }
+
             // Determine if user is Authority or Student
             $profile = null;
             $userType = null;
@@ -55,23 +140,40 @@ class ProfileController extends Controller
                 $profile = Student::find($user->studentId);
                 $userType = 'student';
                 
-                // Get all approved registrations for this student
+                // Get current academic year
+                $currentYear = date('Y');
+                
+                Log::info('Fetching profile for student: ' . $profile->studentId . ', Current Year: ' . $currentYear);
+                
+                // Get all approved registrations for this student where enrollmentYear matches current year
                 $registrations = Registration::where('studentId', $profile->studentId)
                     ->where('status', 'Approved')
+                    ->where('enrollmentYear', $currentYear) // Only get registrations for current year
                     ->get();
+                
+                Log::info('Found ' . $registrations->count() . ' registrations for current year ' . $currentYear);
                 
                 $allClasses = [];
                 $totalMonthlyFee = 0;
                 
                 foreach ($registrations as $registration) {
+                    Log::info('Processing registration ID: ' . $registration->registrationId . 
+                             ', Enrollment Year: ' . $registration->enrollmentYear . 
+                             ', ClassIds: ' . $registration->classIds);
+                    
                     if ($registration->classIds) {
                         $classIds = explode(',', $registration->classIds);
+                        $classIds = array_map('trim', $classIds);
+                        
+                        Log::info('Class IDs for registration ' . $registration->registrationId . ': ' . json_encode($classIds));
                         
                         // Get details for all classes in this registration
+                        // Also filter by class academic year
                         $classes = DB::table('class')
                             ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                             ->leftJoin('authority', 'class.authorityId', '=', 'authority.authorityId')
                             ->whereIn('class.classId', $classIds)
+                            ->where('class.academicYear', $currentYear) // Filter by current academic year
                             ->select(
                                 'class.classId',
                                 'class.classDay',
@@ -84,6 +186,8 @@ class ProfileController extends Controller
                                 'authority.name as teacher'
                             )
                             ->get();
+                        
+                        Log::info('Found ' . $classes->count() . ' classes for registration ' . $registration->registrationId);
                         
                         foreach ($classes as $class) {
                             // Format time
@@ -121,6 +225,8 @@ class ProfileController extends Controller
                 // Sort forms
                 ksort($groupedSubjects);
                 
+                Log::info('Total classes for current year for student ' . $profile->studentId . ': ' . count($allClasses));
+                
                 $profileData = [
                     'id' => $profile->studentId,
                     'userType' => 'student',
@@ -132,7 +238,8 @@ class ProfileController extends Controller
                     'registeredClasses' => $allClasses,
                     'groupedSubjects' => $groupedSubjects,
                     'totalMonthlyFee' => $totalMonthlyFee,
-                    'totalClasses' => count($allClasses)
+                    'totalClasses' => count($allClasses),
+                    'currentAcademicYear' => $currentYear
                 ];
             }
 
@@ -145,7 +252,7 @@ class ProfileController extends Controller
             Log::error('getProfile failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch profile'
+                'message' => 'Failed to fetch profile: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -166,6 +273,40 @@ class ProfileController extends Controller
             }
 
             DB::beginTransaction();
+
+            // Parent can only edit parentEmail
+            if ($request->user()->tokenCan('parent')) {
+                $validator = Validator::make($request->all(), [
+                    'parentEmail' => 'required|email|max:100',
+                    'parentPassword' => ['nullable', 'string', 'min:6', 'regex:/[0-9]/', 'regex:/[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?`~]/'],
+                ]);
+
+                if ($validator->fails()) {
+                    return response()->json([
+                        'success' => false,
+                        'errors' => $validator->errors()
+                    ], 422);
+                }
+
+                $oldParentEmail = $user->parentEmail;
+                $newParentEmail = trim($request->parentEmail);
+
+                $updateData = ['parentEmail' => $newParentEmail];
+                if ($request->filled('parentPassword')) {
+                    $updateData['parentPassword'] = Hash::make($request->parentPassword);
+                }
+
+                DB::table('student')
+                    ->where('parentEmail', $oldParentEmail)
+                    ->update($updateData);
+
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Parent email updated successfully'
+                ]);
+            }
 
             // Check if Authority or Student
             if ($user instanceof Authority) {

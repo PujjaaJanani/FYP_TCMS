@@ -18,6 +18,7 @@ import {
 } from "@ant-design/icons";
 import axios from "axios";
 import { getToken } from "../Utils/LocalStorage";
+import { apiUrl } from "../api";
 
 const { Title, Text } = Typography;
 
@@ -36,25 +37,25 @@ const ParentPayment = () => {
 
   // Rich, solid colors from StaffClasses - good contrast with white text
   const monthColors = {
-  1: "#1A4D6B", // January - Darkest Indigo
-  2: "#0D2B4D", // February - Dark Navy
-  3: "#0D3D2B", // March - Dark Emerald
-  4: "#0D3D5C", // April - Dark Azure
-  5: "#2D0D5C", // May - Dark Violet
-  6: "#0D5C4D", // June - Dark Peacock
-  7: "#1A3D6B", // July - Dark Lapis
-  8: "#3D1A5C", // August - Dark Plum
-  9: "#0D2D5C", // September - Dark Royal
-  10: "#4D0D6B", // October - Dark Grape
-  11: "#0D5C6B", // November - Dark Turquoise
-  12: "#1A4D6B", // December - Dark Cerulean
-};
+    1: "#1A4D6B", // January - Darkest Indigo
+    2: "#0D2B4D", // February - Dark Navy
+    3: "#0D3D2B", // March - Dark Emerald
+    4: "#0D3D5C", // April - Dark Azure
+    5: "#2D0D5C", // May - Dark Violet
+    6: "#0D5C4D", // June - Dark Peacock
+    7: "#1A3D6B", // July - Dark Lapis
+    8: "#3D1A5C", // August - Dark Plum
+    9: "#0D2D5C", // September - Dark Royal
+    10: "#4D0D6B", // October - Dark Grape
+    11: "#0D5C6B", // November - Dark Turquoise
+    12: "#1A4D6B", // December - Dark Cerulean
+  };
 
   const fetchPayments = async () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/payments/student?year=${year}`,
+        apiUrl(`/api/payments/student?year=${year}`),
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -83,7 +84,7 @@ const ParentPayment = () => {
     setVerifying(true);
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/payments/verify/${paymentId}`,
+        apiUrl(`/api/payments/verify/${paymentId}`),
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -120,9 +121,60 @@ const ParentPayment = () => {
     }
   }, [year]);
 
+  // Calculate payment availability for each month
+  const getMonthPaymentStatus = (monthData) => {
+    const currentMonthIndex = currentMonth;
+    const monthIndex = monthData.month;
+    
+    // Already paid months are handled separately
+    if (monthData.status === "Paid") {
+      return { canPay: false, isDisabled: true, reason: "paid" };
+    }
+    
+    // Past months (before current month) - can be paid anytime
+    if (monthIndex < currentMonthIndex) {
+      return { canPay: true, isDisabled: false, reason: "past" };
+    }
+    
+    // Current month
+    if (monthIndex === currentMonthIndex) {
+      return { canPay: true, isDisabled: false, reason: "current" };
+    }
+    
+    // Future months (after current month)
+    // Check if all months from January to current month are paid
+    const monthsJanToCurrent = payments.filter(p => p.month <= currentMonthIndex);
+    const allPaidUpToCurrent = monthsJanToCurrent.every(p => p.status === "Paid");
+    
+    if (!allPaidUpToCurrent) {
+      // Cannot pay ANY future month if Jan-current has unpaid
+      return { canPay: false, isDisabled: true, reason: "unpaid_past_months" };
+    }
+    
+    // All Jan-current are paid, now check if this is the NEXT immediate month
+    // Find the first unpaid month after current month
+    const futureMonths = payments.filter(p => p.month > currentMonthIndex && p.status !== "Paid");
+    const nextUnpaidMonth = futureMonths.length > 0 ? futureMonths[0].month : null;
+    
+    if (monthIndex === nextUnpaidMonth) {
+      // This is the next month to pay
+      return { canPay: true, isDisabled: false, reason: "next_upcoming" };
+    } else {
+      // This is a future month beyond the next unpaid month
+      return { canPay: false, isDisabled: true, reason: "future_blocked" };
+    }
+  };
+
   const handlePayment = async (monthData) => {
+    const { canPay, isDisabled } = getMonthPaymentStatus(monthData);
+    
     if (monthData.status === "Paid") {
       message.info("This month has already been paid");
+      return;
+    }
+    
+    if (isDisabled || !canPay) {
+      message.info("Please pay all previous months first before paying future months");
       return;
     }
 
@@ -163,7 +215,7 @@ const ParentPayment = () => {
         setPaying(true);
         try {
           const res = await axios.post(
-            "http://localhost:8000/api/payments/create-intent",
+            apiUrl("/api/payments/create-intent"),
             {
               month: monthData.month,
               year: year,
@@ -381,22 +433,25 @@ const ParentPayment = () => {
 
           // Only show status for: paid months, past months, or current month
           const showStatus = isPaid || isPastMonth || isCurrentMonth;
+          
+          // Get payment availability
+          const { canPay, isDisabled } = getMonthPaymentStatus(monthData);
 
           return (
             <Col xs={24} sm={12} lg={8} xl={6} key={monthData.month}>
               <Card
                 style={{ ...styles.monthCard, backgroundColor: bgColor }}
                 styles={{ body: styles.monthCardBody }}
-                hoverable={!isPaid}
+                hoverable={!isPaid && !isDisabled}
                 onMouseEnter={(e) => {
-                  if (!isPaid) {
+                  if (!isPaid && !isDisabled) {
                     e.currentTarget.style.transform = "translateY(-8px)";
                     e.currentTarget.style.boxShadow = `0 12px 24px ${bgColor}80`;
                     e.currentTarget.style.borderColor = bgColor;
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isPaid) {
+                  if (!isPaid && !isDisabled) {
                     e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.boxShadow = "none";
                     e.currentTarget.style.borderColor = "transparent";
@@ -425,7 +480,7 @@ const ParentPayment = () => {
                   </div>
 
                   {isPaid ? (
-                    // ← green paid button
+                    // Paid button (green)
                     <div
                       style={{
                         ...styles.paidButton,
@@ -441,12 +496,13 @@ const ParentPayment = () => {
                       type="primary"
                       style={{
                         ...styles.payButton,
-                        backgroundColor: payButtonBg,
-                        color: payButtonText,
+                        backgroundColor: isDisabled ? "#d9d9d9" : payButtonBg,
+                        color: isDisabled ? "#8c8c8c" : payButtonText,
+                        cursor: isDisabled ? "not-allowed" : "pointer",
+                        opacity: isDisabled ? 0.7 : 1,
                       }}
-                      loading={
-                        paying && selectedMonth?.month === monthData.month
-                      }
+                      disabled={isDisabled}
+                      loading={paying && selectedMonth?.month === monthData.month}
                       onClick={() => handlePayment(monthData)}
                       icon={<DollarOutlined style={{ fontSize: 18 }} />}
                     >

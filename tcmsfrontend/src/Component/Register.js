@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import Header from '../Layout/Header';
+import { apiUrl } from '../api';
 import './Register.css';
 
 const { Option } = Select;
@@ -26,7 +27,7 @@ const Register = () => {
 
   const fetchSubjects = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/subjects');
+      const response = await axios.get(apiUrl('/api/subjects'));
       if (response.data.success) {
         setSubjects(response.data.data);
       }
@@ -38,7 +39,7 @@ const Register = () => {
   const fetchClassesBySubject = async (subjectId) => {
     setClassesStatus(null);
     try {
-      const response = await axios.get(`http://localhost:8000/api/classes/by-subject/${subjectId}`);
+      const response = await axios.get(apiUrl(`/api/classes/by-subject/${subjectId}`));
       if (response.data.success) {
         const all = response.data.data;
         if (all.length === 0) {
@@ -161,7 +162,7 @@ const Register = () => {
       };
 
       const response = await axios.post(
-        'http://localhost:8000/api/register',
+        apiUrl('/api/register'),
         registrationData,
         {
           headers: {

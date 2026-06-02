@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { Empty } from 'antd';
 import axios from 'axios';
 import { getToken, getUserType } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 
 const { Title, Text } = Typography;
 
@@ -25,7 +26,7 @@ const StudentClasses = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        'http://localhost:8000/api/student/study-materials/my-classes',
+        apiUrl('/api/student/study-materials/my-classes'),
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
       

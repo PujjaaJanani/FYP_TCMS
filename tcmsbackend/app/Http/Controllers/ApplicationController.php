@@ -32,6 +32,7 @@ class ApplicationController extends Controller
                     'registration.classIds',
                     'student.name as studentName',
                     'student.email as studentEmail',
+                    'student.parentEmail as parentEmail',
                     'student.phone as studentPhone',
                     'student.address as studentAddress'
                 )
@@ -84,6 +85,7 @@ class ApplicationController extends Controller
                     'studentId'      => $reg->studentId,
                     'studentName'    => $reg->studentName,
                     'studentEmail'   => $reg->studentEmail,
+                    'parentEmail'    => $reg->parentEmail,
                     'studentPhone'   => $reg->studentPhone,
                     'studentAddress' => $reg->studentAddress,
                     'classes'        => $classes,

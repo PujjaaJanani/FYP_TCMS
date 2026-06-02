@@ -3,6 +3,7 @@ import { Form, Input, Button, message } from "antd";
 import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
+import { apiUrl } from "../api";
 import "./ResetPassword.css";
 
 const ResetPassword = () => {
@@ -26,7 +27,7 @@ const ResetPassword = () => {
     setLoading(true);
     try {
       const response = await axios.post(
-        "http://localhost:8000/api/auth/reset-password",
+        apiUrl('/api/auth/reset-password'),
         {
           email: email,
           token: token,

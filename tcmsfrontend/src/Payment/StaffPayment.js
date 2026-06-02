@@ -11,6 +11,7 @@ import {
 import axios from 'axios';
 import { getToken } from '../Utils/LocalStorage';
 import moment from 'moment';
+import { apiUrl } from '../api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -50,7 +51,7 @@ const StaffPayment = () => {
   const fetchAvailableYears = async () => {
     try {
       const res = await axios.get(
-        'http://localhost:8000/api/payments/available-years',
+        apiUrl('/api/payments/available-years'),
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
       if (res.data.success) {
@@ -71,7 +72,7 @@ const StaffPayment = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/staff/payments/students-month?year=${year}&month=${month}`,
+        apiUrl(`/api/staff/payments/students-month?year=${year}&month=${month}`),
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
@@ -211,7 +212,7 @@ const StaffPayment = () => {
       };
 
       const res = await axios.post(
-        'http://localhost:8000/api/staff/payments/student-payment',
+        apiUrl('/api/staff/payments/student-payment'),
         payload,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );

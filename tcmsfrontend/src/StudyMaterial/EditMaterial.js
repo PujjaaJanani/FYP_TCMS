@@ -6,6 +6,7 @@ import { ArrowLeftOutlined, SaveOutlined, UploadOutlined } from '@ant-design/ico
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { getToken, getUser } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -53,10 +54,10 @@ const EditMaterial = () => {
     setPageLoading(true);
     try {
       const [classesRes, materialRes] = await Promise.all([
-        axios.get('http://localhost:8000/api/study-materials/my-classes', {
+        axios.get(apiUrl('/api/study-materials/my-classes'), {
           headers: { Authorization: `Bearer ${getToken()}` }
         }),
-        axios.get(`http://localhost:8000/api/study-materials/${materialId}`, {
+        axios.get(apiUrl(`/api/study-materials/${materialId}`), {
           headers: { Authorization: `Bearer ${getToken()}` }
         })
       ]);
@@ -108,7 +109,7 @@ const EditMaterial = () => {
 
     try {
       const res = await axios.post(
-        `http://localhost:8000/api/study-materials/${materialId}?_method=PUT`,
+        apiUrl(`/api/study-materials/${materialId}?_method=PUT`),
         formData,
         {
           headers: {

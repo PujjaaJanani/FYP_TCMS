@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { getToken } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -48,7 +49,7 @@ const AddClassSchedule = () => {
 
   const fetchSubjects = async () => {
     try {
-      const res = await axios.get('http://localhost:8000/api/subjects/manage', {
+      const res = await axios.get(apiUrl('/api/subjects/with-classes'), {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       if (res.data.success) setSubjects(res.data.data);
@@ -60,7 +61,7 @@ const AddClassSchedule = () => {
 
   const fetchTeachers = async () => {
     try {
-      const res = await axios.get('http://localhost:8000/api/teachers', {
+      const res = await axios.get(apiUrl('/api/teachers'), {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       if (res.data.success) setTeachers(res.data.data);
@@ -146,7 +147,7 @@ const AddClassSchedule = () => {
     setUpdatingSubject(true);
     try {
       const res = await axios.put(
-        `http://localhost:8000/api/subjects/${editingSubject.subjectId}`,
+        apiUrl(`/api/subjects/${editingSubject.subjectId}`),
         {
           name: editingSubject.name,
           form: editingSubject.form,
@@ -221,7 +222,7 @@ const AddClassSchedule = () => {
     try {
       // Create teacher in database immediately
       const res = await axios.post(
-        'http://localhost:8000/api/teachers',
+        apiUrl('/api/teachers'),
         newTeacher,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
@@ -279,7 +280,7 @@ const AddClassSchedule = () => {
       }
 
       const res = await axios.post(
-        'http://localhost:8000/api/classes/schedule',
+        apiUrl('/api/classes/schedule'),
         requestData,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
@@ -436,10 +437,10 @@ const AddClassSchedule = () => {
                     >
                       {allSubjects.map(s => (
                         <Option key={s.subjectId} value={s.subjectId}>
-                          <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <Space>
                               <BookOutlined />
-                              <span>{s.name} - {s.form}</span>
+                              <span style={{ fontWeight: 500 }}>{s.name} - {s.form}</span>
                               {s.isTemp && (
                                 <span style={{ 
                                   color: '#52c41a', 
@@ -451,10 +452,23 @@ const AddClassSchedule = () => {
                                 </span>
                               )}
                             </Space>
-                            {/* <div style={{ fontSize: '12px', color: '#52c41a' }}>
-                              Fee: RM {s.subjectFee?.toFixed(2) || '0.00'}
-                            </div> */}
-                          </Space>
+                            {s.classes && s.classes.length > 0 && (
+                              <div style={{ paddingLeft: 20 }}>
+                                {s.classes.map(cls => (
+                                  <div key={cls.classId} style={{ fontSize: '12px', color: '#888', lineHeight: '18px' }}>
+                                    • {cls.classDay} {cls.startTime}–{cls.finishTime}
+                                    {cls.location ? ` · ${cls.location}` : ''}
+                                    {cls.teacherName ? ` · ${cls.teacherName}` : ''}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {(!s.classes || s.classes.length === 0) && !s.isTemp && (
+                              <div style={{ paddingLeft: 20, fontSize: '12px', color: '#bbb', fontStyle: 'italic' }}>
+                                No classes yet
+                              </div>
+                            )}
+                          </div>
                         </Option>
                       ))}
                     </Select>

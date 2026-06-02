@@ -13,6 +13,7 @@ import {
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { getToken } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 import StudentTestMarks from './StudentTestMarks';
 
 const { Title, Text } = Typography;
@@ -33,7 +34,7 @@ const StudentMaterials = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/study-materials/class/${classId}`,
+        apiUrl(`/api/study-materials/class/${classId}`),
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
       if (res.data.success) {
@@ -67,7 +68,7 @@ const StudentMaterials = () => {
     if (material.fileType === 'link') {
       window.open(material.fileUrl, '_blank');
     } else {
-      window.open(`http://localhost:8000${material.fileUrl}`, '_blank');
+      window.open(apiUrl(material.fileUrl), '_blank');
     }
   };
 

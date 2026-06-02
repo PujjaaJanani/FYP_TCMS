@@ -328,7 +328,7 @@ class AuthController extends Controller
         );
 
         // Build reset link for frontend
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+        $frontendUrl = config('app.frontend_url');
         $resetLink = $frontendUrl . '/reset-password?token=' . $plainToken . '&email=' . urlencode($email);
 
         // Send email

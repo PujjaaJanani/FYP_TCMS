@@ -307,4 +307,84 @@ class ParentDashboardController extends Controller
             ], 500);
         }
     }
+
+    /**
+ * Get absent records for a specific child and year
+ */
+public function getAbsentRecords(Request $request)
+{
+    try {
+        $user = $request->user();
+        $studentId = $request->query('studentId');
+        $year = $request->query('year', Carbon::now()->year);
+
+        if (!$user || !$user->parentEmail) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parent account not found'
+            ], 404);
+        }
+
+        // Verify the student belongs to this parent
+        $student = Student::where('studentId', $studentId)
+            ->where('parentEmail', $user->parentEmail)
+            ->first();
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student not found or not linked to this parent'
+            ], 404);
+        }
+
+        // Get student's approved registrations for the selected year
+        $registrations = Registration::where('studentId', $studentId)
+            ->where('status', 'Approved')
+            ->where('enrollmentYear', $year)
+            ->get();
+
+        if ($registrations->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => []
+            ]);
+        }
+
+        $registrationIds = $registrations->pluck('registrationId')->toArray();
+
+        // Get all absent records with class and subject details
+        $absentRecords = DB::table('attendance')
+            ->join('class', 'attendance.classId', '=', 'class.classId')
+            ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
+            ->join('registration', 'attendance.registrationId', '=', 'registration.registrationId')
+            ->whereIn('attendance.registrationId', $registrationIds)
+            ->where('attendance.academicYear', $year)
+            ->where('attendance.status', 'Absent')
+            ->select(
+                'attendance.attendanceId',
+                'attendance.date',
+                'subject.name as subjectName',
+                'subject.form',
+                'class.classDay',
+                'class.startTime',
+                'class.finishTime',
+                'class.location',
+                'registration.registrationId'
+            )
+            ->orderBy('attendance.date', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $absentRecords
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('getAbsentRecords failed: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to fetch absent records'
+        ], 500);
+    }
+}
 }

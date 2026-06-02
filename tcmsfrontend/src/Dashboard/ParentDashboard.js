@@ -15,6 +15,9 @@ import {
   Button,
   message,
   Badge,
+  Modal,
+  Table,
+  Tooltip,
 } from "antd";
 import {
   UserOutlined,
@@ -24,6 +27,7 @@ import {
   ReloadOutlined,
   BellOutlined,
   DollarOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import {
   BarChart,
@@ -33,7 +37,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   PieChart,
@@ -42,6 +46,7 @@ import {
 } from "recharts";
 import axios from "axios";
 import { getToken } from "../Utils/LocalStorage";
+import { apiUrl } from "../api";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -55,8 +60,15 @@ const ParentDashboard = () => {
   const [selectedYear, setSelectedYear] = useState(null);
   const [showMessage, setShowMessage] = useState(false);
   const notificationRef = useRef(null);
+  
+  // State for absent records modal
+  const [absentModalVisible, setAbsentModalVisible] = useState(false);
+  const [absentRecords, setAbsentRecords] = useState([]);
+  const [absentModalLoading, setAbsentModalLoading] = useState(false);
 
-  // Fetch children on component mount
+  // Fetch children on component mount — also fetches years for first child
+  // immediately so selectedChild + selectedYear are set together,
+  // preventing the empty flash race condition on first load.
   useEffect(() => {
     fetchChildren();
   }, []);
@@ -67,13 +79,6 @@ const ParentDashboard = () => {
       fetchDashboardStats();
     }
   }, [selectedChild, selectedYear]);
-
-  // Fetch available years for selected child
-  useEffect(() => {
-    if (selectedChild) {
-      fetchAvailableYears();
-    }
-  }, [selectedChild]);
 
   // Auto-show message on page load if any child has payment pending
   useEffect(() => {
@@ -87,29 +92,57 @@ const ParentDashboard = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        "http://localhost:8000/api/parent/dashboard/children",
+        apiUrl("/api/parent/dashboard/children"),
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
       if (res.data.success && res.data.data.length > 0) {
         setChildren(res.data.data);
-        setSelectedChild(res.data.data[0]);
+        const firstChild = res.data.data[0];
+        setSelectedChild(firstChild);
+
+        // Fetch years immediately for the first child inside the same call
+        // so both selectedChild and selectedYear are set before the stats
+        // effect fires — this eliminates the empty-state flash on first load.
+        try {
+          const yearsRes = await axios.get(
+            apiUrl(`/api/parent/dashboard/available-years/${firstChild.studentId}`),
+            { headers: { Authorization: `Bearer ${getToken()}` } },
+          );
+          if (yearsRes.data.success && yearsRes.data.data.length > 0) {
+            setAvailableYears(yearsRes.data.data);
+            setSelectedYear(yearsRes.data.data[0]);
+          } else {
+            const currentYear = new Date().getFullYear();
+            setAvailableYears([currentYear]);
+            setSelectedYear(currentYear);
+          }
+        } catch {
+          const currentYear = new Date().getFullYear();
+          setAvailableYears([currentYear]);
+          setSelectedYear(currentYear);
+        }
+        // Do NOT call setLoading(false) here — loading stays true until
+        // fetchDashboardStats finishes, preventing the "No data" flash.
       } else {
         setChildren([]);
+        setLoading(false); // no children = nothing more to load
         message.info("No children linked to your account");
       }
     } catch (error) {
       console.error("Error fetching children:", error);
       message.error("Failed to load children data");
-    } finally {
-      setLoading(false);
+      setLoading(false); // stop spinner on error
     }
+    // No finally block — fetchDashboardStats owns the final setLoading(false)
   };
 
-  const fetchAvailableYears = async () => {
+  // fetchAvailableYears accepts a child argument so it can be called from
+  // handleChildChange without relying on stale selectedChild state.
+  const fetchAvailableYears = async (child = selectedChild) => {
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/parent/dashboard/available-years/${selectedChild.studentId}`,
+        apiUrl(`/api/parent/dashboard/available-years/${child.studentId}`),
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -123,8 +156,9 @@ const ParentDashboard = () => {
       }
     } catch (error) {
       console.error("Error fetching years:", error);
-      setAvailableYears([new Date().getFullYear()]);
-      setSelectedYear(new Date().getFullYear());
+      const currentYear = new Date().getFullYear();
+      setAvailableYears([currentYear]);
+      setSelectedYear(currentYear);
     }
   };
 
@@ -132,12 +166,14 @@ const ParentDashboard = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:8000/api/parent/dashboard/stats?studentId=${selectedChild.studentId}&year=${selectedYear}`,
+        apiUrl(`/api/parent/dashboard/stats?studentId=${selectedChild.studentId}&year=${selectedYear}`),
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
       if (res.data.success) {
         setStats(res.data.data);
+        // Also fetch absent records for this child
+        await fetchAbsentRecords();
       }
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -148,16 +184,37 @@ const ParentDashboard = () => {
     }
   };
 
+  const fetchAbsentRecords = async () => {
+    if (!selectedChild || !selectedYear) return;
+    
+    try {
+      const res = await axios.get(
+        apiUrl(`/api/parent/dashboard/absent-records?studentId=${selectedChild.studentId}&year=${selectedYear}`),
+        { headers: { Authorization: `Bearer ${getToken()}` } },
+      );
+      
+      if (res.data.success) {
+        setAbsentRecords(res.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching absent records:", error);
+    }
+  };
+
   const handleChildChange = (child) => {
     setSelectedChild(child);
     setStats(null);
     setShowMessage(false);
+    setAbsentRecords([]);
+    // Pass child directly so fetchAvailableYears doesn't rely on stale state
+    fetchAvailableYears(child);
   };
 
   const handleYearChange = (year) => {
     setSelectedYear(year);
     setStats(null);
     setShowMessage(false);
+    setAbsentRecords([]);
   };
 
   const refreshData = () => {
@@ -168,6 +225,14 @@ const ParentDashboard = () => {
 
   const toggleNotification = () => {
     setShowMessage(!showMessage);
+  };
+
+  const showAbsentRecords = () => {
+    if (absentRecords.length === 0) {
+      message.info("No absent records found for this child");
+      return;
+    }
+    setAbsentModalVisible(true);
   };
 
   // Close message when clicking outside
@@ -183,6 +248,40 @@ const ParentDashboard = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Columns for absent records table
+  const absentColumns = [
+    {
+      title: "Date",
+      dataIndex: "date",
+      key: "date",
+      render: (date) => new Date(date).toLocaleDateString(),
+      sorter: (a, b) => new Date(a.date) - new Date(b.date),
+      defaultSortOrder: "descend",
+    },
+    {
+      title: "Subject",
+      dataIndex: "subjectName",
+      key: "subjectName",
+    },
+    {
+      title: "Form",
+      dataIndex: "form",
+      key: "form",
+      render: (form) => `Form ${form}`,
+    },
+    {
+      title: "Class Day",
+      dataIndex: "classDay",
+      key: "classDay",
+    },
+    {
+      title: "Time",
+      dataIndex: "startTime",
+      key: "time",
+      render: (_, record) => `${record.startTime} - ${record.finishTime}`,
+    },
+  ];
 
   // Colors for multiple test mark lines
   const TEST_COLORS = [
@@ -273,6 +372,8 @@ const ParentDashboard = () => {
       border: "none",
       height: "100%",
       textAlign: "center",
+      cursor: "pointer",
+      transition: "all 0.3s ease",
     },
     chartCard: {
       borderRadius: 12,
@@ -442,14 +543,6 @@ const ParentDashboard = () => {
         </div>
 
         <Flex gap={16} align="center">
-          {/* <Button
-            icon={<ReloadOutlined />}
-            onClick={refreshData}
-            loading={loading}
-          >
-            Refresh
-          </Button> */}
-
           {/* Notification Icon with Badge - Only show if there are pending payments */}
           {hasPendingPayment && (
             <div ref={notificationRef} style={styles.notificationContainer}>
@@ -483,7 +576,7 @@ const ParentDashboard = () => {
                     Dear Parent, the following child/children have pending
                     tuition fees:
                   </div>
-                  {childrenWithPendingPayment.map((child, index) => (
+                  {childrenWithPendingPayment.map((child) => (
                     <div
                       key={child.studentId}
                       style={{ ...styles.messageText, marginLeft: 8 }}
@@ -562,36 +655,70 @@ const ParentDashboard = () => {
           {/* Statistics Cards */}
           <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
             <Col xs={24} sm={12} md={8}>
-              <Card style={styles.statCard}>
-                <Statistic
-                  title="Overall Attendance"
-                  value={stats.overallAttendance || 0}
-                  precision={1}
-                  suffix="%"
-                  prefix={<CalendarOutlined style={{ color: "#3b1fa3" }} />}
-                  valueStyle={{ color: "#3b1fa3", fontWeight: 600 }}
-                />
-              </Card>
+              
+                <Card 
+                  style={styles.statCard}
+                  hoverable
+                  onClick={() => {}}
+                >
+                  <Statistic
+                    title="Overall Attendance"
+                    value={stats.overallAttendance || 0}
+                    precision={1}
+                    suffix="%"
+                    prefix={<CalendarOutlined style={{ color: "#3b1fa3" }} />}
+                    valueStyle={{ color: "#3b1fa3", fontWeight: 600 }}
+                  />
+                </Card>
+              
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Card style={styles.statCard}>
-                <Statistic
-                  title="Present Days"
-                  value={stats.attendance.present || 0}
-                  prefix={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-                  valueStyle={{ color: "#52c41a", fontWeight: 600 }}
-                />
-              </Card>
+              
+                <Card 
+                  style={styles.statCard}
+                  hoverable
+                  onClick={() => {}}
+                >
+                  <Statistic
+                    title="Present Days"
+                    value={stats.attendance.present || 0}
+                    prefix={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
+                    valueStyle={{ color: "#52c41a", fontWeight: 600 }}
+                  />
+                </Card>
+              
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Card style={styles.statCard}>
-                <Statistic
-                  title="Absent Days"
-                  value={stats.attendance.absent || 0}
-                  prefix={<CloseCircleOutlined style={{ color: "#f5222d" }} />}
-                  valueStyle={{ color: "#f5222d", fontWeight: 600 }}
-                />
-              </Card>
+              <Tooltip title="Click to view absent records by class and date">
+                <Card 
+                  style={styles.statCard}
+                  hoverable
+                  onClick={showAbsentRecords}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-4px)";
+                    e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.12)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+                  }}
+                >
+                  <Statistic
+                    title={
+                      <span>
+                        Absent Days{" "}
+                        <EyeOutlined style={{ fontSize: 12, marginLeft: 4, opacity: 0.7 }} />
+                      </span>
+                    }
+                    value={stats.attendance.absent || 0}
+                    prefix={<CloseCircleOutlined style={{ color: "#f5222d" }} />}
+                    valueStyle={{ color: "#f5222d", fontWeight: 600 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: "block" }}>
+                    Click to view details
+                  </Text>
+                </Card>
+              </Tooltip>
             </Col>
           </Row>
 
@@ -625,7 +752,7 @@ const ParentDashboard = () => {
                         position: "insideLeft",
                       }}
                     />
-                    <Tooltip
+                    <RechartsTooltip
                       formatter={(value) => [`${value}%`, "Marks"]}
                       labelFormatter={(label) => `Test: ${label}`}
                     />
@@ -660,96 +787,79 @@ const ParentDashboard = () => {
             )}
           </Card>
 
-          {/* Overall Attendance Pie Chart - Reduced Height */}
-          <Row gutter={[24, 24]}>
-            <Col xs={24}>
-              <Card style={styles.chartCard}>
-                <div style={styles.chartTitle}>🎯 Overall Attendance</div>
-                <div style={styles.attendanceCard}>
-                  <div style={styles.attendancePercent}>
-                    {stats.overallAttendance}%
-                  </div>
-                  <div
-                    style={{ fontSize: 14, color: "#666", marginBottom: 12 }}
-                  >
-                    Attendance Rate
-                  </div>
-                  {stats.attendance.total > 0 ? (
-                    <>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <PieChart>
-                          <Pie
-                            data={[
-                              {
-                                name: "Present",
-                                value: stats.attendance.present,
-                              },
-                              {
-                                name: "Absent",
-                                value: stats.attendance.absent,
-                              },
-                            ]}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={80}
-                            paddingAngle={3}
-                            dataKey="value"
-                            label={({ name, percent }) =>
-                              `${name}: ${(percent * 100).toFixed(1)}%`
-                            }
-                          >
-                            <Cell fill="#52c41a" />
-                            <Cell fill="#f5222d" />
-                          </Pie>
-                          <Tooltip />
-                          <Legend verticalAlign="bottom" height={30} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div style={{ marginTop: 12 }}>
-                        <Flex justify="center" gap={32}>
-                          <div>
-                            <CheckCircleOutlined
-                              style={{
-                                color: "#52c41a",
-                                fontSize: 14,
-                                marginRight: 6,
-                              }}
-                            />
-                            <Text style={{ fontSize: 14 }}>
-                              Present:{" "}
-                              <strong>{stats.attendance.present}</strong>
-                            </Text>
-                          </div>
-                          <div>
-                            <CloseCircleOutlined
-                              style={{
-                                color: "#f5222d",
-                                fontSize: 14,
-                                marginRight: 6,
-                              }}
-                            />
-                            <Text style={{ fontSize: 14 }}>
-                              Absent: <strong>{stats.attendance.absent}</strong>
-                            </Text>
-                          </div>
-                        </Flex>
-                        <div style={{ marginTop: 8, textAlign: "center" }}>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            Total Sessions: {stats.attendance.total}
-                          </Text>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ padding: "40px 20px", color: "#999" }}>
-                      No attendance records recorded yet
-                    </div>
+          {/* Overall Attendance Pie Chart */}
+{/* Overall Attendance Pie Chart */}
+<Row gutter={[24, 24]}>
+  <Col xs={24}>
+    <Card style={styles.chartCard}>
+      <div style={styles.chartTitle}>🎯 Overall Attendance</div>
+      <div style={styles.attendanceCard}>
+        <div style={styles.attendancePercent}>
+          {stats.overallAttendance}%
+        </div>
+        <div
+          style={{ fontSize: 14, color: "#666", marginBottom: 12 }}
+        >
+          Attendance Rate
+        </div>
+        {stats.attendance.total > 0 ? (
+          <>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={[
+                    {
+                      name: "Present",
+                      value: stats.attendance.present,
+                    },
+                    {
+                      name: "Absent",
+                      value: stats.attendance.absent,
+                    },
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={3}
+                  dataKey="value"
+                  label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
+                  labelLine={true}
+                >
+                  <Cell fill="#52c41a" />
+                  <Cell fill="#f5222d" />
+                </Pie>
+                <RechartsTooltip />
+                {/* <Legend 
+                  verticalAlign="bottom" 
+                  height={46}
+                  layout="horizontal"
+                  wrapperStyle={{
+                    paddingTop: 15,
+                  }}
+                  formatter={(value, entry, index) => (
+                    <span style={{ fontSize: 13 }}>
+                      {value}: {index === 0 ? stats.attendance.present : stats.attendance.absent}
+                    </span>
                   )}
-                </div>
-              </Card>
-            </Col>
-          </Row>
+                /> */}
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ marginTop: 8, textAlign: "center" }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Total Sessions: {stats.attendance.total}
+              </Text>
+            </div>
+          </>
+        ) : (
+          <div style={{ padding: "40px 20px", color: "#999" }}>
+            No attendance records recorded yet
+          </div>
+        )}
+      </div>
+    </Card>
+  </Col>
+</Row>
 
           {/* Info Card */}
           <Card style={styles.card}>
@@ -785,6 +895,44 @@ const ParentDashboard = () => {
           <Empty description="No data available" />
         </Card>
       )}
+
+      {/* Absent Records Modal */}
+      <Modal
+        title={
+          <Flex align="center" gap={8}>
+            <CloseCircleOutlined style={{ color: "#f5222d" }} />
+            <span>Absent Records - {selectedChild?.name}</span>
+          </Flex>
+        }
+        open={absentModalVisible}
+        onCancel={() => setAbsentModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setAbsentModalVisible(false)}>
+            Close
+          </Button>
+        ]}
+        width={800}
+      >
+        {absentRecords.length > 0 ? (
+          <>
+            <div style={{ marginBottom: 16 }}>
+              <Text type="secondary">
+                Total absent days: <strong>{absentRecords.length}</strong>
+              </Text>
+            </div>
+            <Table
+              columns={absentColumns}
+              dataSource={absentRecords}
+              rowKey="attendanceId"
+              pagination={{ pageSize: 10 }}
+              size="middle"
+              bordered
+            />
+          </>
+        ) : (
+          <Empty description="No absent records found for this year" />
+        )}
+      </Modal>
     </div>
   );
 };

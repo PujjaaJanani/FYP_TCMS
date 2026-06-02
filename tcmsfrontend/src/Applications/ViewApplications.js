@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import { getToken } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 
 const { Title, Text } = Typography;
 
@@ -25,7 +26,7 @@ const ViewApplications = () => {
   const fetchRegistrations = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:8000/api/registrations', {
+      const res = await axios.get(apiUrl('/api/registrations'), {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.data.success) {
@@ -51,7 +52,7 @@ const ViewApplications = () => {
         setActionLoading(registrationId + 'Approved');
         try {
           const res = await axios.patch(
-            `http://localhost:8000/api/registrations/${registrationId}/status`,
+            apiUrl(`/api/registrations/${registrationId}/status`),
             { status: 'Approved' },
             { headers: { Authorization: `Bearer ${getToken()}` } }
           );
@@ -89,7 +90,7 @@ const ViewApplications = () => {
         setActionLoading(registrationId + 'Rejected');
         try {
           const res = await axios.patch(
-            `http://localhost:8000/api/registrations/${registrationId}/status`,
+            apiUrl(`/api/registrations/${registrationId}/status`),
             { status: 'Rejected' },
             { headers: { Authorization: `Bearer ${getToken()}` } }
           );
@@ -136,15 +137,14 @@ const ViewApplications = () => {
 
   const styles = {
     page: { padding: '28px 32px', minHeight: '100vh', background: '#f7f5ff' },
-    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
-    summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 },
+    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 },
     summaryCard: { borderRadius: 12, textAlign: 'center', cursor: 'pointer', border: '2px solid transparent', transition: 'all 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
     summaryCardActive: { borderColor: '#3b1fa3', transform: 'translateY(-2px)', boxShadow: '0 6px 20px rgba(59, 31, 163, 0.15)' },
     summaryCount: { fontSize: 38, fontWeight: 800, lineHeight: 1, marginBottom: 6 },
     summaryLabel: { fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: '#999' },
     sectionTitle: { fontSize: 14, fontWeight: 700, color: '#3b1fa3', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 },
     classCard: { background: '#f5f0ff', border: '1px solid #d3adf7', borderRadius: 8, padding: '12px 16px' },
-    classSubject: { fontWeight: 700, fontSize: 14, color: '#3b1fa3', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 },
+    classSubject: { fontWeight: 700, fontSize: 14, color: '#3b1fa3', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
     classForm: { fontSize: 11, fontWeight: 500, background: '#3b1fa3', color: '#fff', borderRadius: 4, padding: '1px 7px' },
     classDetail: { fontSize: 13, color: '#555' }
   };
@@ -226,7 +226,7 @@ const ViewApplications = () => {
         <Button icon={<ReloadOutlined />} onClick={fetchRegistrations} loading={loading}>Refresh</Button>
       </div>
 
-      <div style={styles.summaryGrid}>
+      <div className="summary-grid">
         {['All', 'Pending', 'Approved', 'Rejected'].map(s => (
           <Card key={s} hoverable onClick={() => setFilterStatus(s)} style={{ ...styles.summaryCard, ...(filterStatus === s ? styles.summaryCardActive : {}) }}>
             <div style={{ ...styles.summaryCount, color: s === 'All' ? '#3b1fa3' : s === 'Pending' ? '#d48806' : s === 'Approved' ? '#389e0d' : '#cf1322' }}>
@@ -241,7 +241,20 @@ const ViewApplications = () => {
         <Input prefix={<SearchOutlined />} placeholder="Search by student name or email…" value={searchText} onChange={e => setSearchText(e.target.value)} allowClear style={{ width: 300 }} />
       </div>
 
-      <Table dataSource={displayed} columns={columns} rowKey="registrationId" loading={loading} pagination={{ pageSize: 10 }} scroll={{ x: 800 }} />
+      <Table 
+        dataSource={displayed} 
+        columns={columns} 
+        rowKey="registrationId" 
+        loading={loading} 
+        pagination={{
+          pageSize: 10,
+          showSizeChanger: true,
+          showTotal: (total) => `Total ${total} registrations`,
+          pageSizeOptions: ['10', '20', '50', '100']
+        }}
+        scroll={{ x: 1000 }}
+        locale={{ emptyText: loading ? 'Loading...' : 'No registrations found' }}
+      />
 
       <Modal 
         title={<span style={{ color: '#3b1fa3', fontWeight: 700, fontSize: 18 }}>Registration #{detailModal.record?.registrationId}</span>} 
@@ -285,6 +298,7 @@ const ViewApplications = () => {
             <Descriptions bordered column={2} size="small" style={{ marginBottom: 20 }}>
               <Descriptions.Item label="Name" span={2}><Text strong>{detailModal.record.studentName}</Text></Descriptions.Item>
               <Descriptions.Item label="Email" span={2}>{detailModal.record.studentEmail}</Descriptions.Item>
+              <Descriptions.Item label="Parent Email" span={2}>{detailModal.record.parentEmail || '-'}</Descriptions.Item>
               <Descriptions.Item label="Phone">{detailModal.record.studentPhone || '—'}</Descriptions.Item>
               <Descriptions.Item label="Registered On">{new Date(detailModal.record.createdAt).toLocaleString('en-MY')}</Descriptions.Item>
               <Descriptions.Item label="Address" span={2}>{detailModal.record.studentAddress || '—'}</Descriptions.Item>
@@ -305,7 +319,32 @@ const ViewApplications = () => {
 
       <style>{`
         .ant-table-tbody > tr.ant-table-row:hover > td { background: #f0f0f0 !important; }
-        @media (max-width: 768px) { .ant-table { font-size: 12px; } }
+        
+        @media (max-width: 768px) { 
+          .ant-table { font-size: 12px; }
+        }
+        
+        /* Responsive summary cards grid */
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+        
+        @media (max-width: 768px) {
+          .summary-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .summary-grid {
+            grid-template-columns: repeat(1, 1fr);
+            gap: 10px;
+          }
+        }
       `}</style>
     </div>
   );

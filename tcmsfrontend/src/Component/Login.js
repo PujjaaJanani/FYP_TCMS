@@ -3,6 +3,7 @@ import { Form, Input, Button, message, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { saveAuth } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 import Header from '../Layout/Header';
 import './Login.css';
 
@@ -21,7 +22,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/login', {
+      const response = await axios.post(apiUrl('/api/login'), {
         email: values.email,
         password: values.password,
       });
@@ -101,6 +102,15 @@ const Login = () => {
               rules={[{ required: true, message: 'Please input your password!' }]}
             >
               <Input.Password size="large" placeholder="Enter your password" autoComplete="new-password" />
+            </Form.Item>
+            <Form.Item style={{ textAlign: 'right', marginBottom: 16 }}>
+              <Button 
+                type="link" 
+                onClick={() => navigate('/forgot-password')}
+                style={{ padding: 0 }}
+              >
+                Forgot Password?
+              </Button>
             </Form.Item>
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={loading} block size="large" className="login-button">

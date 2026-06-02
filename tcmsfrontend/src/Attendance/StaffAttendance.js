@@ -10,6 +10,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getToken } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 
 const { Title, Text } = Typography;
 
@@ -23,7 +24,7 @@ const StaffAttendance = () => {
   const fetchMyClasses = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:8000/api/attendance/my-classes', {
+      const res = await axios.get(apiUrl('/api/attendance/my-classes'), {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       if (res.data.success) {

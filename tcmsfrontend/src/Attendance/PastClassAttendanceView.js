@@ -6,6 +6,7 @@ import axios from "axios";
 import { getToken } from "../Utils/LocalStorage";
 import dayjs from "dayjs";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { apiUrl } from "../api";
 
 const { Title, Text } = Typography;
 
@@ -33,7 +34,7 @@ const PastClassAttendanceView = () => {
     try {
       console.log('Fetching attendance archive for:', { classId, academicYear });
       const res = await axios.get(
-        `http://localhost:8000/api/attendance/archive/class/${classId}/history?academicYear=${academicYear}`,
+        apiUrl(`/api/attendance/archive/class/${classId}/history?academicYear=${academicYear}`),
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
       console.log('Attendance history response:', res.data);
@@ -73,7 +74,7 @@ const PastClassAttendanceView = () => {
       
       // Encode the date for URL safety
       const encodedDate = encodeURIComponent(dateValue);
-      const url = `http://localhost:8000/api/attendance/archive/class/${classId}/date/${encodedDate}?academicYear=${academicYear}`;
+      const url = apiUrl(`/api/attendance/archive/class/${classId}/date/${encodedDate}?academicYear=${academicYear}`);
       
       console.log('Request URL:', url);
       

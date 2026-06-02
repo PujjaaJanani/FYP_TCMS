@@ -13,6 +13,8 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EnrollmentController;
+use App\Http\Controllers\ParentDashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -58,21 +60,26 @@ Route::get('/test', function() {
     ]);
 });
 
-    // Public routes (no authentication required)
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/register', [RegistrationController::class, 'register']);
-    Route::get('/subjects', [RegistrationController::class, 'getSubjects']); // Public for student registration
-    Route::get('/classes/by-subject/{subjectId}', [RegistrationController::class, 'getClassesBySubject']); // Public
-    Route::get('/classes', [RegistrationController::class, 'getAllClasses']); // Public
-    Route::get('/registration-status/{email}', [RegistrationController::class, 'checkRegistrationStatus']); // Public
-    Route::get('/payments/toyyibpay/callback', [PaymentController::class, 'toyyibpayCallback']);
-    Route::post('/payments/toyyibpay/callback', [PaymentController::class, 'toyyibpayCallback']);
-    
-    // Public class schedule (no authentication required)
-    Route::get('/classes/schedule/public', [ClassScheduleController::class, 'getPublicClasses']);
+// Public routes (no authentication required)
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [RegistrationController::class, 'register']);
+Route::get('/subjects', [RegistrationController::class, 'getSubjects']); // Public for student registration
+Route::get('/classes/by-subject/{subjectId}', [RegistrationController::class, 'getClassesBySubject']); // Public
+Route::get('/classes', [RegistrationController::class, 'getAllClasses']); // Public
+Route::get('/registration-status/{email}', [RegistrationController::class, 'checkRegistrationStatus']); // Public
+Route::get('/payments/toyyibpay/callback', [PaymentController::class, 'toyyibpayCallback']);
+Route::post('/payments/toyyibpay/callback', [PaymentController::class, 'toyyibpayCallback']);
+Route::post('/enrollment/check-student', [EnrollmentController::class, 'checkStudent']);
+Route::post('/enrollment/submit', [EnrollmentController::class, 'submitEnrollment']);
+Route::get('/enrollment/current-year-classes', [EnrollmentController::class, 'getCurrentYearClasses']);
+Route::get('/enrollment/classes/by-subject/{subjectId}', [EnrollmentController::class, 'getClassesBySubjectForCurrentYear']);
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+// Public class schedule (no authentication required)
+Route::get('/classes/schedule/public', [ClassScheduleController::class, 'getPublicClasses']);
 
-    // Protected routes - using Sanctum
-    Route::middleware('auth:sanctum')->group(function () {
+// Protected routes - using Sanctum
+Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
@@ -94,6 +101,8 @@ Route::get('/test', function() {
     Route::get('/subjects/manage', [ClassScheduleController::class, 'getAllSubjects']);
     Route::post('/subjects', [ClassScheduleController::class, 'createSubject']);
     Route::put('/subjects/{id}', [ClassScheduleController::class, 'updateSubject']); 
+    Route::get('/subjects/with-classes', [ClassScheduleController::class, 'getSubjectsWithClasses']);
+    Route::get('/classes/available-years', [ClassScheduleController::class, 'getAvailableYears']);
 
     // Study Materials Management
     Route::get('/study-materials/my-classes', [StudyMaterialController::class, 'getMyClasses']);
@@ -113,6 +122,7 @@ Route::get('/test', function() {
         Route::post('/', [TestMarkController::class, 'store']);
         Route::put('/{classId}/{testName}/{testDate}', [TestMarkController::class, 'update']);
         Route::delete('/{classId}/{testName}/{testDate}', [TestMarkController::class, 'destroy']);
+        Route::get('/class/{classId}/student/{studentId}/history', [TestMarkController::class, 'getStudentHistory']);
         
         // Debug routes
         Route::get('/debug', [TestMarkController::class, 'debugStudent']);
@@ -126,16 +136,20 @@ Route::get('/test', function() {
         Route::get('/class/{classId}/history', [AttendanceController::class, 'getClassAttendanceHistory']);
         Route::get('/class/{classId}/date/{date}', [AttendanceController::class, 'getAttendanceByDate']);
         Route::delete('/class/{classId}/date/{date}', [AttendanceController::class, 'deleteAttendanceByDate']); 
+        Route::get('/archive/class/{classId}/history', [AttendanceController::class, 'getClassAttendanceHistoryByYear']);
+        Route::get('/archive/class/{classId}/date/{date}', [AttendanceController::class, 'getAttendanceByDateByYear']);
     });
 
+    // Payment Routes
     Route::prefix('payments')->group(function () {
         Route::get('/student', [PaymentController::class, 'getStudentPayments']);
         Route::get('/monthly-fee', [PaymentController::class, 'getMonthlyFee']);
         Route::post('/create-intent', [PaymentController::class, 'createPaymentIntent']);
-        // In routes/api.php payments section, add:
         Route::get('/verify/{paymentId}', [PaymentController::class, 'verifyPaymentStatus']);
+        Route::get('/available-years', [PaymentController::class, 'getAvailableYears']);
     });
 
+    // Staff Payment Management Routes
     Route::prefix('staff/payments')->group(function () {
         Route::get('/', [PaymentController::class, 'getAllPayments']);
         Route::get('/stats', [PaymentController::class, 'getPaymentStats']);
@@ -144,6 +158,7 @@ Route::get('/test', function() {
         Route::post('/student-payment', [PaymentController::class, 'upsertStudentPayment']);
     });
 
+    // User Management Routes
     Route::prefix('users')->group(function () {
         Route::get('/', [UserController::class, 'getAllUsers']);
         Route::get('/{userType}/{id}', [UserController::class, 'getUser']);
@@ -151,6 +166,7 @@ Route::get('/test', function() {
         Route::put('/{userType}/{id}', [UserController::class, 'updateUser']);
         Route::delete('/{userType}/{id}', [UserController::class, 'deleteUser']);
         Route::get('/student/{studentId}/registration', [UserController::class, 'getStudentRegistration']);
+        Route::get('/available-years', [UserController::class, 'getAvailableYears']);
     });
 
     // Profile Management
@@ -159,15 +175,40 @@ Route::get('/test', function() {
     Route::post('/profile/upload-picture', [ProfileController::class, 'uploadProfilePicture']);
     Route::delete('/profile/delete-picture', [ProfileController::class, 'deleteProfilePicture']);
 
-    // Dashboard Statistics
+    // Dashboard Statistics (Staff/Admin/Student)
     Route::get('/dashboard/stats', [DashboardController::class, 'getDashboardStats']);
 
+    // Parent Dashboard Routes
+    Route::prefix('parent/dashboard')->group(function () {
+        Route::get('/children', [ParentDashboardController::class, 'getChildren']);
+        Route::get('/stats', [ParentDashboardController::class, 'getDashboardStats']);
+        Route::get('/available-years/{studentId}', [ParentDashboardController::class, 'getAvailableYears']);
+        Route::get('/absent-records', [ParentDashboardController::class, 'getAbsentRecords']);
+    });
+
+    // Test SMS Route (Development only)
+    Route::get('/test-sms/{studentId}', function ($studentId) {
+        $student = DB::table('student')->where('studentId', $studentId)->first();
+        
+        if (!$student || !$student->phone) {
+            return response()->json(['error' => 'Student not found or no phone number']);
+        }
+        
+        $smsService = new \App\Services\SMSService();
+        $result = $smsService->sendSms($student->phone, 'Test SMS from TCMS at ' . now());
+        
+        return response()->json([
+            'student' => $student->name,
+            'phone' => $student->phone,
+            'success' => $result
+        ]);
+    });
 });
 
 // Preflight OPTIONS requests - Simplified CORS handling
 Route::options('/{any}', function () {
     return response('', 204)
-        ->header('Access-Control-Allow-Origin', 'http://localhost:3000')
+        ->header('Access-Control-Allow-Origin', config('app.frontend_url'))
         ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
         ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-XSRF-TOKEN')
         ->header('Access-Control-Allow-Credentials', 'true')

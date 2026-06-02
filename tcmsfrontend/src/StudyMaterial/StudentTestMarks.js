@@ -11,6 +11,7 @@ import {
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { getToken, getUser } from '../Utils/LocalStorage';
+import { apiUrl } from '../api';
 
 const { Title, Text } = Typography;
 const { Column } = Table;
@@ -38,7 +39,7 @@ const StudentTestMarks = () => {
 
       // First get the student's registration for this class
       const studentRes = await axios.get(
-        `http://localhost:8000/api/testmarks/class/${classId}/students`,
+        apiUrl(`/api/testmarks/class/${classId}/students`),
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
@@ -57,7 +58,7 @@ const StudentTestMarks = () => {
 
       // Get all tests for this class
       const testsRes = await axios.get(
-        `http://localhost:8000/api/testmarks/class/${classId}?academicYear=${currentYear}`,
+        apiUrl(`/api/testmarks/class/${classId}?academicYear=${currentYear}`),
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
