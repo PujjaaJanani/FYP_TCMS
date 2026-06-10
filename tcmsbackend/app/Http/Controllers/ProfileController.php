@@ -131,7 +131,7 @@ class ProfileController extends Controller
                     'email' => $profile->email,
                     'phone' => $profile->phone,
                     'role' => $profile->role,
-                    'profilePicture' => $profile->profilePicture ? url('profile/' . $profile->profilePicture) : null,
+                    'profilePicture' => $profile->profilePicture ? config('filesystems.disks.spaces.url') . '/' . $profile->profilePicture : null,
                     'createdAt' => $profile->createdAt
                 ];
             }
@@ -234,7 +234,7 @@ class ProfileController extends Controller
                     'email' => $profile->email,
                     'phone' => $profile->phone,
                     'address' => $profile->address,
-                    'profilePicture' => $profile->profilePicture ? url('profile/' . $profile->profilePicture) : null,
+                    'profilePicture' => $profile->profilePicture ? config('filesystems.disks.spaces.url') . '/' . $profile->profilePicture : null,
                     'registeredClasses' => $allClasses,
                     'groupedSubjects' => $groupedSubjects,
                     'totalMonthlyFee' => $totalMonthlyFee,
@@ -434,14 +434,12 @@ class ProfileController extends Controller
             // Generate unique filename
             $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
             
-            // Ensure profile directory exists
-            $profilePath = public_path('profile');
-            if (!file_exists($profilePath)) {
-                mkdir($profilePath, 0777, true);
-            }
-
-            // Move file to public/profile directory
-            $file->move($profilePath, $filename);
+            $path = Storage::disk('spaces')->putFileAs(
+                'profile',
+                $file,
+                $filename,
+                'public'
+            );
 
             // Update database
             if ($user instanceof Authority) {
@@ -449,13 +447,10 @@ class ProfileController extends Controller
                 
                 // Delete old profile picture if exists
                 if ($profile->profilePicture) {
-                    $oldPath = public_path('profile/' . $profile->profilePicture);
-                    if (file_exists($oldPath)) {
-                        unlink($oldPath);
-                    }
+                    Storage::disk('spaces')->delete($profile->profilePicture);
                 }
-                
-                $profile->profilePicture = $filename;
+
+                $profile->profilePicture = $path;
                 $profile->save();
 
             } else if ($user instanceof Student) {
@@ -463,13 +458,10 @@ class ProfileController extends Controller
                 
                 // Delete old profile picture if exists
                 if ($profile->profilePicture) {
-                    $oldPath = public_path('profile/' . $profile->profilePicture);
-                    if (file_exists($oldPath)) {
-                        unlink($oldPath);
-                    }
+                    Storage::disk('spaces')->delete($profile->profilePicture);
                 }
                 
-                $profile->profilePicture = $filename;
+                $profile->profilePicture = $path;
                 $profile->save();
             }
 
@@ -477,7 +469,7 @@ class ProfileController extends Controller
                 'success' => true,
                 'message' => 'Profile picture updated successfully',
                 'data' => [
-                    'profilePicture' => url('profile/' . $filename)
+                    'profilePicture' => config('filesystems.disks.spaces.url') . '/' . $path
                 ]
             ]);
 
@@ -509,27 +501,21 @@ class ProfileController extends Controller
                 $profile = Authority::find($user->authorityId);
                 
                 if ($profile->profilePicture) {
-                    $filePath = public_path('profile/' . $profile->profilePicture);
-                    if (file_exists($filePath)) {
-                        unlink($filePath);
-                    }
-                    
-                    $profile->profilePicture = null;
-                    $profile->save();
+                    Storage::disk('spaces')->delete($profile->profilePicture);
                 }
+
+                $profile->profilePicture = null;
+                $profile->save();
 
             } else if ($user instanceof Student) {
                 $profile = Student::find($user->studentId);
                 
                 if ($profile->profilePicture) {
-                    $filePath = public_path('profile/' . $profile->profilePicture);
-                    if (file_exists($filePath)) {
-                        unlink($filePath);
-                    }
-                    
-                    $profile->profilePicture = null;
-                    $profile->save();
+                    Storage::disk('spaces')->delete($profile->profilePicture);
                 }
+
+                $profile->profilePicture = null;
+                $profile->save();
             }
 
             return response()->json([

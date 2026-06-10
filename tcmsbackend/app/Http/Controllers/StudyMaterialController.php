@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 
 class StudyMaterialController extends Controller
 {
@@ -336,24 +336,21 @@ class StudyMaterialController extends Controller
                 $file = $request->file('file');
                 $fileName = time() . '_' . $file->getClientOriginalName();
 
-                // Define the public materials directory path
-                $materialsPath = public_path('materials');
+                // Upload to DigitalOcean Spaces
+                $path = Storage::disk('spaces')->putFileAs(
+                    'materials',
+                    $file,
+                    $fileName,
+                    'public'
+                );
 
-                // Create the directory if it doesn't exist
-                if (!File::exists($materialsPath)) {
-                    File::makeDirectory($materialsPath, 0755, true);
-                }
+                // Set the URL to the full URL
+                $fileUrl = config('filesystems.disks.spaces.url') . '/' . $path;
 
-                // Move the file to public/materials directory
-                $file->move($materialsPath, $fileName);
-
-                // Set the URL path to /materials/filename
-                $fileUrl = '/materials/' . $fileName;
-
-                Log::info('File uploaded to public/materials', [
+                Log::info('File uploaded to DigitalOcean Spaces', [
                     'original_name' => $file->getClientOriginalName(),
                     'saved_as' => $fileName,
-                    'path' => $materialsPath,
+                    'path' => $path,
                     'url' => $fileUrl
                 ]);
             } else if ($request->fileType === 'link') {
@@ -439,35 +436,38 @@ class StudyMaterialController extends Controller
 
             // Handle new file upload
             if ($request->hasFile('file')) {
-                // Delete old file if exists from public/materials
+                // Delete old file from DigitalOcean Spaces if exists
                 if ($material->fileName) {
-                    $oldFilePath = public_path('materials/' . $material->fileName);
-                    if (File::exists($oldFilePath)) {
-                        File::delete($oldFilePath);
-                        Log::info('Deleted old file: ' . $oldFilePath);
+                    // Extract the path from the URL if stored as full URL
+                    if (strpos($material->fileUrl, config('filesystems.disks.spaces.url')) === 0) {
+                        $oldPath = str_replace(config('filesystems.disks.spaces.url') . '/', '', $material->fileUrl);
+                        Storage::disk('spaces')->delete($oldPath);
+                        Log::info('Deleted old file from Spaces: ' . $oldPath);
+                    } else {
+                        // Fallback: try to delete by fileName
+                        Storage::disk('spaces')->delete('materials/' . $material->fileName);
+                        Log::info('Deleted old file from Spaces by fileName: ' . $material->fileName);
                     }
                 }
 
                 $file = $request->file('file');
                 $fileName = time() . '_' . $file->getClientOriginalName();
 
-                // Define the public materials directory path
-                $materialsPath = public_path('materials');
+                // Upload to DigitalOcean Spaces
+                $path = Storage::disk('spaces')->putFileAs(
+                    'materials',
+                    $file,
+                    $fileName,
+                    'public'
+                );
 
-                // Create the directory if it doesn't exist
-                if (!File::exists($materialsPath)) {
-                    File::makeDirectory($materialsPath, 0755, true);
-                }
-
-                // Move the file to public/materials directory
-                $file->move($materialsPath, $fileName);
-
-                // Set the URL path to /materials/filename
-                $updateData['fileUrl'] = '/materials/' . $fileName;
+                // Set the URL to the full URL
+                $updateData['fileUrl'] = config('filesystems.disks.spaces.url') . '/' . $path;
                 $updateData['fileName'] = $fileName;
 
-                Log::info('New file uploaded to public/materials', [
+                Log::info('New file uploaded to DigitalOcean Spaces', [
                     'saved_as' => $fileName,
+                    'path' => $path,
                     'url' => $updateData['fileUrl']
                 ]);
             } else if ($request->fileType === 'link') {
@@ -515,12 +515,17 @@ class StudyMaterialController extends Controller
                 ], 404);
             }
 
-            // Delete file from public/materials if exists
+            // Delete file from DigitalOcean Spaces if exists
             if ($material->fileName) {
-                $filePath = public_path('materials/' . $material->fileName);
-                if (File::exists($filePath)) {
-                    File::delete($filePath);
-                    Log::info('Deleted file: ' . $filePath);
+                // Extract the path from the URL if stored as full URL
+                if ($material->fileUrl && strpos($material->fileUrl, config('filesystems.disks.spaces.url')) === 0) {
+                    $filePath = str_replace(config('filesystems.disks.spaces.url') . '/', '', $material->fileUrl);
+                    Storage::disk('spaces')->delete($filePath);
+                    Log::info('Deleted file from Spaces: ' . $filePath);
+                } else {
+                    // Fallback: try to delete by fileName
+                    Storage::disk('spaces')->delete('materials/' . $material->fileName);
+                    Log::info('Deleted file from Spaces by fileName: ' . $material->fileName);
                 }
             }
 
