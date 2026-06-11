@@ -19,6 +19,7 @@ import {
 import axios from "axios";
 import { getToken } from "../Utils/LocalStorage";
 import { apiUrl } from "../api";
+import ParentReceipt from "./ParentReceipt";
 
 const { Title, Text } = Typography;
 
@@ -34,6 +35,7 @@ const ParentPayment = () => {
   const today = new Date();
   const currentMonth = today.getMonth() + 1;
   const currentDay = today.getDate();
+  const [successfulPayment, setSuccessfulPayment] = useState(null);
 
   // Rich, solid colors from StaffClasses - good contrast with white text
   const monthColors = {
@@ -90,6 +92,16 @@ const ParentPayment = () => {
 
       if (res.data.success && res.data.status === "Paid") {
         message.success("Payment successful! 🎉");
+        // Store payment data for receipt
+        setSuccessfulPayment({
+          paymentId: res.data.payment?.paymentId || paymentId,
+          monthName: res.data.payment?.monthName,
+          year: res.data.payment?.academicYear || year,
+          amount: res.data.amount,
+          method: res.data.payment?.method || "Online Payment",
+          transactionId: res.data.payment?.transactionId,
+          datePaid: new Date().toISOString(),
+        });
         fetchPayments();
         return true;
       } else {
@@ -103,6 +115,11 @@ const ParentPayment = () => {
     } finally {
       setVerifying(false);
     }
+  };
+
+  const handleBackToPayments = () => {
+    setSuccessfulPayment(null);
+    fetchPayments();
   };
 
   useEffect(() => {
@@ -351,6 +368,15 @@ const ParentPayment = () => {
     );
   }
 
+  if (successfulPayment) {
+    return (
+      <ParentReceipt 
+        payment={successfulPayment} 
+        onBack={handleBackToPayments} 
+      />
+    );
+  }
+
   // If no registration for current year
   if (!hasRegistration) {
     return (
@@ -437,6 +463,7 @@ const ParentPayment = () => {
           // Get payment availability
           const { canPay, isDisabled } = getMonthPaymentStatus(monthData);
 
+
           return (
             <Col xs={24} sm={12} lg={8} xl={6} key={monthData.month}>
               <Card
@@ -469,12 +496,10 @@ const ParentPayment = () => {
                       </div>
                     )}
 
+                    {/* Paid date - same size as status, appears after status */}
                     {isPaid && monthData.datePaid && (
-                      <div
-                        style={{ fontSize: 12, opacity: 0.9, color: "white" }}
-                      >
-                        Paid:{" "}
-                        {new Date(monthData.datePaid).toLocaleDateString()}
+                      <div style={{ ...styles.statusText, fontSize: 14, opacity: 0.9 }}>
+                        Paid: {new Date(monthData.datePaid).toLocaleDateString()}
                       </div>
                     )}
                   </div>

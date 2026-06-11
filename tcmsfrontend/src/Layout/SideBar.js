@@ -191,7 +191,6 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
           fontSize: collapsed ? 11 : 15,
           textAlign: 'center',
           lineHeight: 1.4,
-          fontStyle: 'italic',
           letterSpacing: '0.3px',
           background: 'rgba(0,0,0,0.1)',
           borderBottom: '2px solid rgba(255,255,255,0.2)',

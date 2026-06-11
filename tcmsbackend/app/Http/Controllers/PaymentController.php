@@ -428,7 +428,7 @@ class PaymentController extends Controller
     /**
      * Verify payment status manually (called from frontend after redirect)
      */
-     public function verifyPaymentStatus(Request $request, $paymentId)
+    public function verifyPaymentStatus(Request $request, $paymentId)
     {
         try {
             $payment = Payment::find($paymentId);
@@ -442,10 +442,49 @@ class PaymentController extends Controller
 
             // If already paid, return success
             if ($payment->paymentStatus === 'Paid') {
+                $remark = json_decode($payment->remark, true);
+                $parentEmail = $remark['parentEmail'] ?? null;
+                
+                $totalAmount = $payment->amount;
+                $childNames = [];
+                $isParentPayment = false;
+                
+                // If this is a parent payment, get ALL related payments and sum them
+                if ($parentEmail) {
+                    $isParentPayment = true;
+                    $allParentPayments = Payment::where('transactionId', $payment->transactionId)
+                        ->where('paymentStatus', 'Paid')
+                        ->get();
+                    
+                    $totalAmount = $allParentPayments->sum('amount');
+                    
+                    foreach ($allParentPayments as $p) {
+                        $pRemark = json_decode($p->remark, true);
+                        // Get child name from registration
+                        $registration = DB::table('registration')
+                            ->join('student', 'registration.studentId', '=', 'student.studentId')
+                            ->where('registration.registrationId', $p->registrationId)
+                            ->select('student.name')
+                            ->first();
+                        if ($registration) {
+                            $childNames[] = $registration->name;
+                        }
+                    }
+                }
+                
                 return response()->json([
                     'success' => true,
                     'status' => 'Paid',
-                    'payment' => $payment
+                    'payment' => $payment,
+                    'payment_id' => $payment->paymentId,
+                    'monthName' => $remark['monthName'] ?? null,
+                    'academicYear' => $payment->academicYear,
+                    'amount' => $totalAmount,
+                    'method' => $payment->method,
+                    'transactionId' => $payment->transactionId,
+                    'datePaid' => $payment->datePaid,
+                    'children' => $childNames,
+                    'isParentPayment' => $isParentPayment
                 ]);
             }
 
@@ -504,6 +543,30 @@ class PaymentController extends Controller
                             $targetPayment->save();
                         }
 
+                        // Calculate total amount and child names for parent payment
+                        $totalAmount = $payment->amount;
+                        $childNames = [];
+                        $isParentPayment = false;
+                        
+                        if ($parentEmail) {
+                            $isParentPayment = true;
+                            $allParentPayments = Payment::where('transactionId', $billCode)
+                                ->where('paymentStatus', 'Paid')
+                                ->get();
+                            $totalAmount = $allParentPayments->sum('amount');
+                            
+                            foreach ($allParentPayments as $p) {
+                                $registration = DB::table('registration')
+                                    ->join('student', 'registration.studentId', '=', 'student.studentId')
+                                    ->where('registration.registrationId', $p->registrationId)
+                                    ->select('student.name')
+                                    ->first();
+                                if ($registration) {
+                                    $childNames[] = $registration->name;
+                                }
+                            }
+                        }
+
                         Log::info('Payment verified and updated', [
                             'payment_id' => $paymentId,
                             'bill_code' => $billCode
@@ -512,7 +575,16 @@ class PaymentController extends Controller
                         return response()->json([
                             'success' => true,
                             'status' => 'Paid',
-                            'payment' => $payment
+                            'payment' => $payment,
+                            'payment_id' => $payment->paymentId,
+                            'monthName' => $remark['monthName'] ?? null,
+                            'academicYear' => $payment->academicYear,
+                            'amount' => $totalAmount,
+                            'method' => $payment->method,
+                            'transactionId' => $payment->transactionId,
+                            'datePaid' => $payment->datePaid,
+                            'children' => $childNames,
+                            'isParentPayment' => $isParentPayment
                         ]);
                     }
                 }
