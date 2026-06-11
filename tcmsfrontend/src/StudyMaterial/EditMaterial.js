@@ -265,6 +265,9 @@ const EditMaterial = () => {
                         </Button>
                       </Upload>
                       <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
+                        Max file size: 50MB
+                      </Typography.Text>
+                      <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
                         Leave empty to keep existing file
                       </Typography.Text>
                       {ALLOWED_TYPES[fileType] && (

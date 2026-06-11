@@ -644,6 +644,9 @@ const ViewProfile = () => {
                   loading={uploadingPhoto}
                 />
               </Upload>
+              <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280', textAlign: 'center' }}>
+                Max file size: 2MB
+              </div>
             </div>
             {profile?.profilePicture && (
               <Button

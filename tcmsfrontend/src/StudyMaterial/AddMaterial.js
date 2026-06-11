@@ -252,6 +252,9 @@ const AddMaterial = () => {
                           Select File (Max 50MB)
                         </Button>
                       </Upload>
+                      <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
+                        Max file size: 50MB
+                      </Typography.Text>
                       {ALLOWED_TYPES[fileType] && (
                         <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
                           Accepted: {ALLOWED_TYPES[fileType].label}
