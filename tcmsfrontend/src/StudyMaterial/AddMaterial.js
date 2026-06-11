@@ -15,7 +15,7 @@ const { Option } = Select;
 const ALLOWED_TYPES = {
   pdf:   { mimes: ['application/pdf'], exts: ['.pdf'], label: 'PDF (.pdf)' },
   image: { mimes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'], exts: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'], label: 'Image (.jpg, .jpeg, .png, .gif, .webp, .svg)' },
-  video: { mimes: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-msvideo'], exts: ['.mp4', '.webm', '.ogg', '.mov', '.avi'], label: 'Video (.mp4, .webm, .ogg, .mov, .avi)' },
+  // video: { mimes: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-msvideo'], exts: ['.mp4', '.webm', '.ogg', '.mov', '.avi'], label: 'Video (.mp4, .webm, .ogg, .mov, .avi)' },
   zip:   { mimes: ['application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed'], exts: ['.zip', '.rar', '.7z'], label: 'Archive (.zip, .rar, .7z)' },
 };
 
@@ -223,7 +223,7 @@ const AddMaterial = () => {
                     <Select onChange={(val) => { setFileType(val); setFileList([]); }}>
                       <Option value="pdf">PDF Document</Option>
                       <Option value="image">Image</Option>
-                      <Option value="video">Video</Option>
+                      {/* <Option value="video">Video</Option> */}
                       <Option value="zip">ZIP Archive</Option>
                       <Option value="link">External Link</Option>
                     </Select>
