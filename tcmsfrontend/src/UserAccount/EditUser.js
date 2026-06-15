@@ -22,13 +22,18 @@ const EditUser = () => {
   const [fetchingClasses, setFetchingClasses] = useState(false);
   const [registrationLoaded, setRegistrationLoaded] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [parentEmailError, setParentEmailError] = useState('');
   const [passwordValid, setPasswordValid] = useState(true);
   const [passwordErrors, setPasswordErrors] = useState([]);
+  const [parentPasswordValid, setParentPasswordValid] = useState(true);
+  const [parentPasswordErrors, setParentPasswordErrors] = useState([]);
 
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
+    parentEmail: '',
+    parentPassword: '',
     phone: '',
     address: '',
     role: 'Staff',
@@ -129,10 +134,48 @@ const EditUser = () => {
     return errors.length === 0;
   };
 
+  const validateParentPassword = (password) => {
+    const errors = [];
+
+    if (password && password.length > 0) {
+      if (password.length < 6) {
+        errors.push('Password must be at least 6 characters');
+      }
+      if (!/\d/.test(password)) {
+        errors.push('Password must contain at least one number');
+      }
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) {
+        errors.push('Password must contain at least one symbol');
+      }
+    }
+
+    setParentPasswordErrors(errors);
+    setParentPasswordValid(errors.length === 0);
+    return errors.length === 0;
+  };
+
   const handlePasswordChange = (e) => {
     const value = e.target.value;
     setForm({ ...form, password: value });
     validatePassword(value);
+  };
+
+  const handleParentEmailChange = (e) => {
+    const value = e.target.value;
+    setForm({ ...form, parentEmail: value });
+    if (!value) {
+      setParentEmailError('Parent email is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      setParentEmailError('Please enter a valid parent email address');
+    } else {
+      setParentEmailError('');
+    }
+  };
+
+  const handleParentPasswordChange = (e) => {
+    const value = e.target.value;
+    setForm({ ...form, parentPassword: value });
+    validateParentPassword(value);
   };
 
   const validateEmail = (email) => {
@@ -171,6 +214,8 @@ const EditUser = () => {
           name: user.name || '',
           email: user.email || '',
           password: '',
+          parentEmail: user.parentEmail || '',
+          parentPassword: '',
           phone: user.phone || user.contactNumber || '',
           role: user.role || 'Staff',
         };
@@ -325,6 +370,22 @@ const EditUser = () => {
     }
 
     if (userType === 'student') {
+      if (!form.parentEmail) {
+        setParentEmailError('Parent email is required');
+        message.error('Parent email is required');
+        return;
+      }
+      if (parentEmailError) {
+        message.error(parentEmailError);
+        return;
+      }
+      if (form.parentPassword && !validateParentPassword(form.parentPassword)) {
+        message.error('Parent password does not meet requirements');
+        return;
+      }
+    }
+
+    if (userType === 'student') {
       if (!form.address) {
         message.error('Address is required for students');
         return;
@@ -351,6 +412,10 @@ const EditUser = () => {
 
       // Add student-specific fields only if userType is student
       if (userType === 'student') {
+        payload.parentEmail = form.parentEmail;
+        if (form.parentPassword) {
+          payload.parentPassword = form.parentPassword;
+        }
         payload.address = form.address;
         payload.classIds = selectedClasses;
         payload.monthlyFee = form.monthlyFee;
@@ -582,6 +647,50 @@ const EditUser = () => {
         {/* Student-specific fields */}
         {userType === 'student' && (
           <>
+            <div style={styles.formGroup}>
+              <div style={styles.label}>
+                Parent Email <span style={styles.required}>*</span>
+              </div>
+              <Input
+                value={form.parentEmail}
+                onChange={handleParentEmailChange}
+                placeholder="Enter parent email address"
+                type="email"
+                size="large"
+                status={parentEmailError ? 'error' : ''}
+              />
+              {parentEmailError && <div style={styles.errorText}>{parentEmailError}</div>}
+            </div>
+
+            <div style={styles.formGroup}>
+              <div style={styles.label}>
+                Parent Password <span style={{ color: '#666', fontWeight: 400 }}>(leave blank to keep current)</span>
+              </div>
+              <Input.Password
+                value={form.parentPassword}
+                onChange={handleParentPasswordChange}
+                placeholder="Enter new parent password (min 6 characters, 1 digit, 1 symbol)"
+                size="large"
+                status={!parentPasswordValid && form.parentPassword ? 'error' : ''}
+              />
+              {form.parentPassword && (
+                <div style={styles.passwordHint}>
+                  <div style={form.parentPassword.length >= 6 ? styles.hintValid : styles.hintInvalid}>
+                    {form.parentPassword.length >= 6 ? '✓' : '✗'} At least 6 characters
+                  </div>
+                  <div style={/\d/.test(form.parentPassword) ? styles.hintValid : styles.hintInvalid}>
+                    {/\d/.test(form.parentPassword) ? '✓' : '✗'} At least 1 number
+                  </div>
+                  <div style={/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(form.parentPassword) ? styles.hintValid : styles.hintInvalid}>
+                    {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(form.parentPassword) ? '✓' : '✗'} At least 1 symbol
+                  </div>
+                </div>
+              )}
+              {parentPasswordErrors.length > 0 && (
+                <div style={styles.errorText}>{parentPasswordErrors[0]}</div>
+              )}
+            </div>
+
             {/* Address */}
             <div style={styles.formGroup}>
               <div style={styles.label}>

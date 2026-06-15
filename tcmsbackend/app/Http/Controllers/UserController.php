@@ -186,6 +186,8 @@ class UserController extends Controller
             'email' => 'required|email|max:100',
             'password' => 'required|string|min:6',
             'phone' => 'required|string|max:20',
+            'parentEmail' => 'required_if:userType,student|email|max:100',
+            'parentPassword' => ['required_if:userType,student', 'string', 'min:6', 'regex:/[0-9]/', 'regex:/[!@#$%^&*()_+\-=\[\]{};\'":\\|,.<>\/?`~]/'],
             'address' => 'required_if:userType,student|string|max:255',
             'role' => 'required_if:userType,authority|in:Admin,Staff',
             'classIds' => 'required_if:userType,student|array|min:1',
@@ -232,6 +234,8 @@ class UserController extends Controller
                 $student = Student::create([
                     'name' => $request->name,
                     'email' => $request->email,
+                    'parentEmail' => $request->parentEmail,
+                    'parentPassword' => Hash::make($request->parentPassword),
                     'password' => Hash::make($request->password),
                     'phone' => $request->phone,
                     'address' => $request->address
@@ -288,6 +292,8 @@ class UserController extends Controller
             'name' => 'required|string|max:100',
             'email' => 'required|email|max:100',
             'phone' => 'required|string|max:20',
+            'parentEmail' => 'required_if:' . $userType . ',student|email|max:100',
+            'parentPassword' => ['nullable', 'string', 'min:6', 'regex:/[0-9]/', 'regex:/[!@#$%^&*()_+\-=\[\]{};\'":\\|,.<>\/?`~]/'],
             'address' => 'required_if:' . $userType . ',student|string|max:255',
             'role' => 'required_if:' . $userType . ',authority|in:Admin,Staff',
             'password' => 'nullable|string|min:6',
@@ -364,10 +370,15 @@ class UserController extends Controller
                 $user->name = $request->name;
                 $user->email = $request->email;
                 $user->phone = $request->phone;
+                $user->parentEmail = $request->parentEmail;
                 $user->address = $request->address;
                 
                 if ($request->filled('password')) {
                     $user->password = Hash::make($request->password);
+                }
+
+                if ($request->filled('parentPassword')) {
+                    $user->parentPassword = Hash::make($request->parentPassword);
                 }
 
                 // Update registration for current year
