@@ -65,7 +65,7 @@ const Header = () => {
             className="enroll-btn"
             onClick={() => navigate('/enrollment')}
           >
-            ENROL NOW
+            ENROLL NOW
           </Button>
           <Button 
             type="primary" 
