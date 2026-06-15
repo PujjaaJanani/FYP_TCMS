@@ -265,10 +265,13 @@ class UserController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             Log::error('createUser failed: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create user'
+                'message' => $e->getMessage(),
+                'trace' => $e->getFile() . ':' . $e->getLine()
             ], 500);
         }
     }
