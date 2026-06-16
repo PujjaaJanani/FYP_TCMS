@@ -1,5 +1,5 @@
-// ContentArea.js
-import React from 'react';
+// ContentArea.js - Updated to handle mobile sidebar header spacing
+import React, { useState, useEffect } from 'react';
 import { Layout } from 'antd';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Footer from './Footer';
@@ -49,8 +49,21 @@ import ParentPayment from '../Payment/ParentPayment';
 const { Content } = Layout;
 
 const ContentArea = () => {
-  const [collapsed, setCollapsed] = React.useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
+
+  // Check screen size
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   // Routes where Sidebar should NOT appear
   const publicRoutes = ['/', '/login', '/register', '/about', '/contact', '/forgot-password', '/reset-password'];
@@ -68,7 +81,7 @@ const ContentArea = () => {
       )}
 
       <Layout style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden' }}>
-        <Content style={{ flexShrink: 0 }}>
+        <Content style={{ flexShrink: 0, marginTop: (isMobile && showSidebar) ? 60 : 0 }}>
           <Routes>
             {/* Public Routes */}
             <Route path="/"         element={<LandingPage />} />

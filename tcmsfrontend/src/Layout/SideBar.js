@@ -1,20 +1,23 @@
-// SideBar.js - FIXED VERSION with proper profile highlighting and past record routing
-import React from 'react';
-import { Layout, Menu } from 'antd';
+// Sidebar.js - Responsive version (sidebar on desktop, top header with hamburger on mobile)
+import React, { useState, useEffect } from 'react';
+import { Layout, Menu, Drawer } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  HomeOutlined,
-  UserOutlined,
-  CalendarOutlined,
-  DollarOutlined,
-  BookOutlined,
-  TeamOutlined,
-  LogoutOutlined,
-  ProfileOutlined,
+import { 
+  HomeOutlined, 
+  UserOutlined, 
+  CalendarOutlined, 
+  DollarOutlined, 
+  BookOutlined, 
+  TeamOutlined, 
+  LogoutOutlined, 
+  ProfileOutlined, 
   CheckSquareOutlined,
-  DashboardOutlined
+  DashboardOutlined,
+  MenuOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import { getUserType, getRole, clearAuth } from '../Utils/LocalStorage';
+import './Sidebar.css';
 
 const { Sider } = Layout;
 
@@ -25,11 +28,30 @@ function getItem(label, key, icon, onClick, children) {
 const Sidebar = ({ collapsed, toggleCollapse }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const userType = getUserType();
-  const role     = getRole();
+  const role = getRole();
 
-  // Route mapping - includes past record routes
+  // Check screen size on mount and on resize
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  // Close mobile menu when navigating
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
+
+  // Route mapping
   const routeKeyMap = {
     '/admin/dashboard':        'admin-1',
     '/admin/users':            'admin-2',
@@ -44,29 +66,25 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     '/student/materials':      'student-5',
     '/parent/dashboard':       'parent-2',
     '/parent/payment':         'parent-3',
-    // Past record view routes - map to Class Schedule
     '/staff/attendance/archive': 'staff-3',
     '/staff/class-archive':      'staff-3',
   };
 
-  // Match current path — also handles sub-routes
   const getSelectedKey = () => {
     const path = location.pathname;
     const currentUserType = getUserType();
     const currentRole = getRole();
     
-    // Handle profile page - dynamically based on user type
     if (path === '/profile') {
       if (currentUserType === 'authority') {
-        return 'staff-2';  // Profile in staff menu
+        return 'staff-2';
       } else if (currentUserType === 'student') {
-        return 'student-2'; // Profile in student menu
+        return 'student-2';
       } else if (currentUserType === 'parent') {
         return 'parent-1';
       }
     }
     
-    // Handle class schedule route (shared between admin and staff)
     if (path === '/authority/schedule') {
       if (currentRole === 'Admin') {
         return 'admin-3';
@@ -75,7 +93,6 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
       }
     }
     
-    // Handle past record routes
     if (path.startsWith('/staff/attendance/archive')) {
       return 'staff-3';
     }
@@ -84,7 +101,6 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
       return 'staff-3';
     }
     
-    // Handle prefix matches for nested routes
     for (const [route, key] of Object.entries(routeKeyMap)) {
       if (path.startsWith(route)) {
         return key;
@@ -96,10 +112,10 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
 
   const selectedKey = getSelectedKey();
 
-  // ── Admin menu ────────────────────────────────────────────────
+  // Menu items definitions
   const adminItems = [
     getItem('Home',            'admin-1', <HomeOutlined />,     () => navigate('/admin/dashboard')),
-    getItem(<span style={{ lineHeight: 1.2 }}>User<br />Management</span>, 'admin-2', <TeamOutlined />, () => navigate('/admin/users')),
+    getItem('User Management', 'admin-2', <TeamOutlined />,     () => navigate('/admin/users')),
     getItem('Class Schedule',  'admin-3', <CalendarOutlined />, () => navigate('/authority/schedule')),
     getItem('Logout',          'admin-4', <LogoutOutlined />,   () => {
       clearAuth();
@@ -107,7 +123,6 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     }),
   ];
 
-  // ── Staff menu ────────────────────────────────────────────────
   const staffItems = [
     getItem('Home',           'staff-1', <HomeOutlined />,     () => navigate('/staff/dashboard')),
     getItem('Profile',        'staff-2', <UserOutlined />,     () => navigate('/profile')),
@@ -122,7 +137,6 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     }),
   ];
 
-  // ── Student menu ──────────────────────────────────────────────
   const studentItems = [
     getItem('Home',           'student-1', <HomeOutlined />,     () => navigate('/student/dashboard')),
     getItem('Profile',        'student-2', <UserOutlined />,     () => navigate('/profile')),
@@ -134,7 +148,6 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     }),
   ];
 
-  // —— Parent menu ——————————————————————————————————————————————
   const parentItems = [
     getItem('Dashboard',      'parent-2', <DashboardOutlined />, () => navigate('/parent/dashboard')),
     getItem('Profile',        'parent-1', <UserOutlined />,      () => navigate('/profile')),
@@ -145,7 +158,6 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     }),
   ];
 
-  // ── Pick correct menu based on role ───────────────────────────
   const getMenuItems = () => {
     if (userType === 'authority') {
       return role === 'Admin' ? adminItems : staffItems;
@@ -156,14 +168,63 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     if (userType === 'parent') {
       return parentItems;
     }
-    return []; // Not logged in — render nothing
+    return [];
   };
 
   const items = getMenuItems();
-
-  // Don't render sidebar if no user / not logged in
   if (!userType) return null;
 
+  // MOBILE VIEW - Top header with hamburger menu
+  if (isMobile) {
+    return (
+      <>
+        <header className="mobile-sidebar-header">
+          <div className="mobile-sidebar-brand" onClick={() => { navigate('/'); closeMobileMenu(); }}>
+            Hari's Tuition Center
+          </div>
+          <button className="mobile-sidebar-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            {mobileMenuOpen ? <CloseOutlined /> : <MenuOutlined />}
+          </button>
+        </header>
+
+        <Drawer
+          placement="left"
+          open={mobileMenuOpen}
+          onClose={closeMobileMenu}
+          closable={false}
+          width={280}
+          styles={{
+            body: {
+              padding: 0,
+              background: 'linear-gradient(180deg, #5B3A9E 0%, #3b1fa3 100%)',
+            }
+          }}
+        >
+          <div className="mobile-sidebar-drawer-brand">
+            <div style={{ fontSize: 18, marginBottom: 4 }}>Hari's Tuition</div>
+            <div style={{ fontSize: 14 }}>Center</div>
+          </div>
+          <Menu
+            theme="dark"
+            mode="inline"
+            selectedKeys={[selectedKey]}
+            items={items}
+            style={{ 
+              background: 'transparent', 
+              borderRight: 0,
+              paddingTop: 8,
+              paddingLeft: 12,
+              paddingRight: 12
+            }}
+            className="custom-sidebar-menu"
+            onClick={closeMobileMenu}
+          />
+        </Drawer>
+      </>
+    );
+  }
+
+  // DESKTOP VIEW - Normal collapsible sidebar
   return (
     <Sider
       collapsible
@@ -177,7 +238,6 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
         boxShadow: '2px 0 8px rgba(0,0,0,0.15)'
       }}
     >
-      {/* Brand / Logo area */}
       <div
         style={{
           display: 'flex',
@@ -221,117 +281,6 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
         }}
         className="custom-sidebar-menu"
       />
-
-      <style jsx global>{`
-        .custom-sidebar-menu .ant-menu-item {
-          height: auto !important;
-          min-height: 48px !important;
-          line-height: 1.3 !important;
-          padding-top: 8px !important;
-          padding-bottom: 8px !important;
-          margin: 4px 0 !important;
-          border-radius: 8px !important;
-          padding-left: 16px !important;
-          font-size: 14px !important;
-          font-weight: 500 !important;
-          color: rgba(255, 255, 255, 0.85) !important;
-          transition: all 0.3s ease !important;
-        }
-
-        .custom-sidebar-menu .ant-menu-item:hover {
-          background: rgba(255, 255, 255, 0.15) !important;
-          color: #ffffff !important;
-        }
-
-        .custom-sidebar-menu .ant-menu-item-selected {
-          background: #ffffff !important;
-          color: #3b1fa3 !important;
-          font-weight: 600 !important;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
-        }
-
-        .custom-sidebar-menu .ant-menu-item-selected::after {
-          display: none !important;
-        }
-
-        .custom-sidebar-menu .ant-menu-item .anticon {
-          font-size: 18px !important;
-          margin-right: 8px !important;
-        }
-
-        .custom-sidebar-menu .ant-menu-item-selected .anticon {
-          color: #3b1fa3 !important;
-        }
-
-        /* Collapsed state styles */
-        .ant-layout-sider-collapsed .custom-sidebar-menu {
-          padding-left: 0 !important;
-          padding-right: 0 !important;
-        }
-
-        .ant-layout-sider-collapsed .custom-sidebar-menu .ant-menu-item {
-          margin: 4px 0 !important;
-          padding: 8px 0 !important;
-          min-height: 48px !important;
-          height: auto !important;
-          text-align: center !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          position: relative !important;
-        }
-
-        .ant-layout-sider-collapsed .custom-sidebar-menu .ant-menu-item .anticon {
-          margin: 0 !important;
-          font-size: 22px !important;
-        }
-
-        .ant-layout-sider-collapsed .custom-sidebar-menu .ant-menu-item .ant-menu-title-content {
-          display: none !important;
-        }
-
-        .ant-layout-sider-collapsed .custom-sidebar-menu .ant-menu-item-selected {
-          background: #ffffff !important;
-          color: #3b1fa3 !important;
-          width: 60px !important;
-          margin: 4px auto !important;
-          left: 0 !important;
-          right: 0 !important;
-        }
-
-        .ant-layout-sider-collapsed .custom-sidebar-menu .ant-menu-item-selected .anticon {
-          color: #3b1fa3 !important;
-        }
-
-        .ant-layout-sider-collapsed .custom-sidebar-menu .ant-menu-item:hover {
-          width: 60px !important;
-          margin: 4px auto !important;
-          left: 0 !important;
-          right: 0 !important;
-        }
-
-        /* Remove default Ant Design borders */
-        .custom-sidebar-menu .ant-menu-item::before {
-          display: none !important;
-        }
-
-        /* Logout item special styling */
-        .custom-sidebar-menu .ant-menu-item:last-child {
-          margin-top: 16px !important;
-          border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-          padding-top: 8px !important;
-        }
-
-        /* Sider trigger button */
-        .ant-layout-sider-trigger {
-          background: rgba(0, 0, 0, 0.2) !important;
-          border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-        }
-
-        .ant-layout-sider-trigger:hover {
-          background: rgba(0, 0, 0, 0.3) !important;
-        }
-      `}</style>
     </Sider>
   );
 };

@@ -119,3 +119,85 @@
 .ant-layout-sider-trigger:hover {
   background: rgba(0, 0, 0, 0.3) !important;
 }
+
+/* ============================================ */
+/* MOBILE SIDEBAR STYLES (Top Header with Hamburger) */
+/* ============================================ */
+
+/* Mobile header bar */
+.mobile-sidebar-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(135deg, #5B3A9E 0%, #3b1fa3 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+.mobile-sidebar-brand {
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+
+.mobile-sidebar-toggle {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.3s;
+}
+
+.mobile-sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Drawer brand area */
+.mobile-sidebar-drawer-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Adjust menu items for drawer */
+.mobile-sidebar-drawer-brand + .custom-sidebar-menu {
+  margin-top: 8px;
+}
+
+/* Override drawer body padding */
+.ant-drawer-body {
+  padding: 0 !important;
+}
+
+/* Ensure menu items are properly spaced in drawer */
+.mobile-sidebar-drawer-brand + .custom-sidebar-menu .ant-menu-item {
+  margin: 8px 0 !important;
+}
+
+/* Add padding to the main content area on mobile to account for fixed header */
+@media (max-width: 768px) {
+  .ant-layout-content {
+    margin-top: 60px;
+  }
+}
