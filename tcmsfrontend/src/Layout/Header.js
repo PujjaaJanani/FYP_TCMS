@@ -1,5 +1,5 @@
-// src/Layout/Header.js
-import React, { useState } from 'react';
+// src/Layout/Header.js - Updated with body scroll lock
+import React, { useState, useEffect } from 'react';
 import { Button } from 'antd';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { MenuOutlined, CloseOutlined } from '@ant-design/icons';
@@ -11,12 +11,40 @@ const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
+    const newState = !mobileMenuOpen;
+    setMobileMenuOpen(newState);
+    
+    // Prevent body scroll when mobile menu is open
+    if (newState) {
+      document.body.classList.add('mobile-menu-open');
+    } else {
+      document.body.classList.remove('mobile-menu-open');
+    }
   };
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
+    document.body.classList.remove('mobile-menu-open');
   };
+
+  // Clean up body class on component unmount
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('mobile-menu-open');
+    };
+  }, []);
+
+  // Close mobile menu when window is resized to desktop size
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 992 && mobileMenuOpen) {
+        closeMobileMenu();
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [mobileMenuOpen]);
 
   // Function to check if a link is active
   const isActive = (path) => {

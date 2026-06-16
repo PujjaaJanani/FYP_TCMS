@@ -1,4 +1,4 @@
-/* src/Layout/Header.css */
+/* src/Layout/Header.css - FIXED VERSION */
 
 /* ============================================
    HEADER - Main Container
@@ -45,7 +45,7 @@
 .header-nav {
   display: flex;
   align-items: center;
-  gap: 8px; /* Reduced from 32px to 8px */
+  gap: 8px;
   margin-left: auto;
   margin-right: 24px;
 }
@@ -56,7 +56,7 @@
   font-weight: 600;
   letter-spacing: 0.5px;
   text-decoration: none;
-  padding: 8px 12px; /* Reduced horizontal padding from 16px to 12px */
+  padding: 8px 12px;
   border-radius: 6px;
   transition: all 0.3s ease;
   position: relative;
@@ -127,7 +127,7 @@
 .enroll-btn:hover {
   background: white !important;
   border-color: white !important;
-  color: #5a4fcf !important; /* Text changes to purple on hover */
+  color: #5a4fcf !important;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
@@ -178,7 +178,7 @@
 }
 
 /* ============================================
-   MOBILE NAVIGATION
+   MOBILE NAVIGATION - FIXED COLLAPSE ISSUE
    ============================================ */
 .mobile-nav {
   display: none;
@@ -190,14 +190,21 @@
   right: 0;
   padding: 0;
   max-height: 0;
+  opacity: 0;
+  visibility: hidden;
   overflow: hidden;
-  transition: max-height 0.3s ease, padding 0.3s ease;
+  transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.2s ease-out, visibility 0.3s ease-out;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 999;
 }
 
 .mobile-nav-open {
+  display: flex;
   max-height: 500px;
   padding: 20px 40px;
+  opacity: 1;
+  visibility: visible;
+  overflow-y: auto;
 }
 
 .mobile-nav-link {
@@ -264,7 +271,7 @@
 }
 
 /* ============================================
-   RESPONSIVE BREAKPOINTS
+   RESPONSIVE BREAKPOINTS - IMPROVED
    ============================================ */
 
 /* Tablet & Mobile */
@@ -278,13 +285,13 @@
     display: none;
   }
 
-  .mobile-menu-toggle,
-  .mobile-nav {
+  .mobile-menu-toggle {
     display: flex;
   }
-
-  .header-brand {
-    font-size: 18px;
+  
+  /* Mobile nav is shown when toggled, not by default */
+  .mobile-nav {
+    display: flex;
   }
 }
 
@@ -301,7 +308,6 @@
 
   .mobile-nav {
     top: 60px;
-    padding: 16px 20px;
   }
 
   .mobile-nav-open {
@@ -346,6 +352,28 @@
     font-size: 12px;
     height: 38px;
   }
+  
+  .mobile-nav-open {
+    padding: 12px 16px;
+  }
+}
+
+/* ============================================
+   ADDITIONAL FIXES FOR COLLAPSE
+   ============================================ */
+
+/* Ensure proper transition when closing */
+.mobile-nav:not(.mobile-nav-open) {
+  pointer-events: none;
+}
+
+.mobile-nav.mobile-nav-open {
+  pointer-events: auto;
+}
+
+/* Prevent body scroll when mobile menu is open */
+body.mobile-menu-open {
+  overflow: hidden;
 }
 
 /* ============================================
