@@ -1124,7 +1124,7 @@ class PaymentController extends Controller
         }
 
         try {
-            // Get registration for this student for the specific academic year
+            // Get registration
             $registration = DB::table('registration')
                 ->where('studentId', $request->studentId)
                 ->where('status', 'Approved')
@@ -1140,42 +1140,56 @@ class PaymentController extends Controller
 
             $monthName = date('F', mktime(0, 0, 0, $request->month, 1));
 
-            // FIX: Get all payments for this registration and filter in PHP
+            // FIX: Get ALL payments and filter in PHP (works on all MySQL versions)
             $allPayments = Payment::where('registrationId', $registration->registrationId)->get();
 
             $existingPayment = null;
             foreach ($allPayments as $payment) {
                 $remark = json_decode($payment->remark, true);
                 if (
+                    is_array($remark) &&
                     isset($remark['month']) && isset($remark['year']) &&
-                    $remark['month'] == $request->month && $remark['year'] == $request->year
+                    (int) $remark['month'] === (int) $request->month &&
+                    (int) $remark['year'] === (int) $request->year
                 ) {
                     $existingPayment = $payment;
                     break;
                 }
             }
 
+            // Log for debugging
+            Log::info('Payment upsert - Finding existing payment', [
+                'registrationId' => $registration->registrationId,
+                'month' => $request->month,
+                'year' => $request->year,
+                'found' => $existingPayment ? $existingPayment->paymentId : null,
+                'total_payments' => $allPayments->count()
+            ]);
+
             if ($existingPayment) {
                 // Update existing payment
-                $existingPayment->amount = $request->amount;
+                $existingPayment->amount = (float) $request->amount;
                 $existingPayment->paymentStatus = $request->paymentStatus;
 
-                if ($request->has('method') && $request->paymentStatus === 'Paid') {
-                    $existingPayment->setAttribute('method', $request->input('method'));
-                } elseif ($request->paymentStatus === 'Pending') {
+                if ($request->paymentStatus === 'Paid') {
+                    if ($request->has('method')) {
+                        $existingPayment->setAttribute('method', $request->input('method'));
+                    }
+                    if ($request->has('datePaid')) {
+                        $existingPayment->datePaid = $request->datePaid;
+                    } else {
+                        $existingPayment->datePaid = now();
+                    }
+                } else {
+                    // Pending - clear method and date
                     $existingPayment->setAttribute('method', null);
-                }
-
-                if ($request->has('datePaid') && $request->paymentStatus === 'Paid') {
-                    $existingPayment->datePaid = $request->datePaid;
-                } elseif ($request->paymentStatus === 'Pending') {
                     $existingPayment->datePaid = null;
                 }
 
-                // Update remark with month/year info
-                $remark = json_decode($existingPayment->remark, true);
-                $remark['month'] = $request->month;
-                $remark['year'] = $request->year;
+                // Update remark
+                $remark = json_decode($existingPayment->remark, true) ?: [];
+                $remark['month'] = (int) $request->month;
+                $remark['year'] = (int) $request->year;
                 $remark['monthName'] = $monthName;
 
                 if ($request->paymentStatus === 'Paid') {
@@ -1188,11 +1202,17 @@ class PaymentController extends Controller
                 $existingPayment->save();
 
                 $payment = $existingPayment;
+
+                Log::info('Payment updated successfully', [
+                    'payment_id' => $payment->paymentId,
+                    'status' => $payment->paymentStatus,
+                    'amount' => $payment->amount
+                ]);
             } else {
                 // Create new payment
                 $remarkData = [
-                    'month' => $request->month,
-                    'year' => $request->year,
+                    'month' => (int) $request->month,
+                    'year' => (int) $request->year,
                     'monthName' => $monthName,
                 ];
 
@@ -1202,31 +1222,31 @@ class PaymentController extends Controller
 
                 $payment = Payment::create([
                     'registrationId' => $registration->registrationId,
-                    'amount' => $request->amount,
+                    'amount' => (float) $request->amount,
                     'datePaid' => $request->paymentStatus === 'Paid' ? ($request->datePaid ?? now()) : null,
                     'paymentStatus' => $request->paymentStatus,
                     'method' => $request->paymentStatus === 'Paid' ? $request->input('method') : null,
-                    'academicYear' => $request->year,
+                    'academicYear' => (int) $request->year,
                     'remark' => json_encode($remarkData)
+                ]);
+
+                Log::info('Payment created successfully', [
+                    'payment_id' => $payment->paymentId,
+                    'status' => $payment->paymentStatus
                 ]);
             }
 
-            Log::info('Student payment upserted by staff', [
-                'student_id' => $request->studentId,
-                'month' => $request->month,
-                'year' => $request->year,
-                'status' => $request->paymentStatus,
-                'payment_id' => $payment->paymentId
-            ]);
-
+            // Return the updated payment
             return response()->json([
                 'success' => true,
                 'message' => 'Payment saved successfully',
-                'data' => $payment
+                'data' => Payment::find($payment->paymentId)
             ]);
 
         } catch (\Exception $e) {
-            Log::error('upsertStudentPayment failed: ' . $e->getMessage());
+            Log::error('upsertStudentPayment failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to save payment: ' . $e->getMessage()
