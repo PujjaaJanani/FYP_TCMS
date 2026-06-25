@@ -975,50 +975,45 @@ class PaymentController extends Controller
             $year = $request->query('year', date('Y'));
             $month = $request->query('month', date('n'));
 
-            // Get all approved registrations for the specific academic year
+            // Get all approved registrations
             $students = DB::table('registration')
                 ->join('student', 'registration.studentId', '=', 'student.studentId')
-                ->leftJoin('payment', function ($join) use ($year, $month) {
-                    $join->on('registration.registrationId', '=', 'payment.registrationId')
-                        ->whereRaw('JSON_EXTRACT(payment.remark, "$.year") = ?', [$year])
-                        ->whereRaw('JSON_EXTRACT(payment.remark, "$.month") = ?', [$month]);
-                })
-                ->select(
-                    'student.studentId',
-                    'student.name as studentName',
-                    'student.email',
-                    'student.phone',
-                    'registration.registrationId',
-                    'registration.classIds',
-                    'registration.monthlyFee',
-                    'registration.status as registrationStatus',
-                    'registration.enrollmentYear',
-                    'payment.paymentId',
-                    'payment.amount',
-                    'payment.datePaid',
-                    'payment.method',
-                    'payment.paymentStatus',
-                    'payment.transactionId',
-                    'payment.remark'
-                )
                 ->where('registration.status', 'Approved')
                 ->where('registration.enrollmentYear', $year)
                 ->orderBy('student.name')
                 ->get();
 
-            // Get class names for each student
+            // Get all payments for these registrations
+            $registrationIds = $students->pluck('registrationId')->toArray();
+            $allPayments = Payment::whereIn('registrationId', $registrationIds)->get();
+
             $result = [];
             foreach ($students as $student) {
+                // Find payment for this student for the specific month/year using PHP filtering
+                $payment = null;
+                foreach ($allPayments as $p) {
+                    $remark = json_decode($p->remark, true);
+                    if (
+                        is_array($remark) &&
+                        $p->registrationId == $student->registrationId &&
+                        isset($remark['month']) && isset($remark['year']) &&
+                        (int) $remark['month'] === (int) $month &&
+                        (int) $remark['year'] === (int) $year
+                    ) {
+                        $payment = $p;
+                        break;
+                    }
+                }
+
+                // Get class names
                 $classIds = $student->classIds ? explode(',', $student->classIds) : [];
                 $classNames = [];
-
                 foreach ($classIds as $classId) {
                     $class = DB::table('class')
                         ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
                         ->where('class.classId', $classId)
                         ->select('subject.name as subjectName', 'subject.form')
                         ->first();
-
                     if ($class) {
                         $formText = $class->form;
                         if (strpos($formText, 'Form') === false && strpos($formText, 'form') === false) {
@@ -1028,24 +1023,21 @@ class PaymentController extends Controller
                     }
                 }
 
-                // Parse remark to get month/year info
-                $remark = $student->remark ? json_decode($student->remark, true) : null;
-
-                // If payment exists, use its data, otherwise create default pending record
-                if ($student->paymentId) {
+                if ($payment) {
+                    $remark = json_decode($payment->remark, true);
                     $result[] = [
-                        'paymentId' => $student->paymentId,
+                        'paymentId' => $payment->paymentId,
                         'studentId' => $student->studentId,
-                        'studentName' => $student->studentName,
+                        'studentName' => $student->name,
                         'email' => $student->email,
                         'phone' => $student->phone,
                         'classes' => implode(', ', $classNames),
                         'monthlyFee' => (float) $student->monthlyFee,
-                        'amount' => (float) $student->amount,
-                        'datePaid' => $student->datePaid,
-                        'method' => $student->method,
-                        'paymentStatus' => $student->paymentStatus,
-                        'transactionId' => $student->transactionId,
+                        'amount' => (float) $payment->amount,
+                        'datePaid' => $payment->datePaid,
+                        'method' => $payment->method,
+                        'paymentStatus' => $payment->paymentStatus,
+                        'transactionId' => $payment->transactionId,
                         'paymentMonth' => $remark['monthName'] ?? null,
                         'paymentYear' => $remark['year'] ?? null,
                         'enrollmentYear' => $student->enrollmentYear,
@@ -1053,11 +1045,10 @@ class PaymentController extends Controller
                         'year' => (int) $year
                     ];
                 } else {
-                    // No payment record exists for this month/year
                     $result[] = [
                         'paymentId' => null,
                         'studentId' => $student->studentId,
-                        'studentName' => $student->studentName,
+                        'studentName' => $student->name,
                         'email' => $student->email,
                         'phone' => $student->phone,
                         'classes' => implode(', ', $classNames),
