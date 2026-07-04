@@ -44,6 +44,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import api from "../api/axios";
 import axios from "axios";
 import { getToken } from "../Utils/LocalStorage";
 import { apiUrl } from "../api";
@@ -91,8 +92,8 @@ const ParentDashboard = () => {
   const fetchChildren = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        apiUrl("/api/parent/dashboard/children"),
+      const res = await api.get(
+        "/api/parent/dashboard/children",
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -105,8 +106,8 @@ const ParentDashboard = () => {
         // so both selectedChild and selectedYear are set before the stats
         // effect fires — this eliminates the empty-state flash on first load.
         try {
-          const yearsRes = await axios.get(
-            apiUrl(`/api/parent/dashboard/available-years/${firstChild.studentId}`),
+          const yearsRes = await api.get(
+            `/api/parent/dashboard/available-years/${firstChild.studentId}`,
             { headers: { Authorization: `Bearer ${getToken()}` } },
           );
           if (yearsRes.data.success && yearsRes.data.data.length > 0) {
@@ -141,8 +142,8 @@ const ParentDashboard = () => {
   // handleChildChange without relying on stale selectedChild state.
   const fetchAvailableYears = async (child = selectedChild) => {
     try {
-      const res = await axios.get(
-        apiUrl(`/api/parent/dashboard/available-years/${child.studentId}`),
+      const res = await api.get(
+        `/api/parent/dashboard/available-years/${child.studentId}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -165,8 +166,8 @@ const ParentDashboard = () => {
   const fetchDashboardStats = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        apiUrl(`/api/parent/dashboard/stats?studentId=${selectedChild.studentId}&year=${selectedYear}`),
+      const res = await api.get(
+        `/api/parent/dashboard/stats?studentId=${selectedChild.studentId}&year=${selectedYear}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -188,8 +189,8 @@ const ParentDashboard = () => {
     if (!selectedChild || !selectedYear) return;
     
     try {
-      const res = await axios.get(
-        apiUrl(`/api/parent/dashboard/absent-records?studentId=${selectedChild.studentId}&year=${selectedYear}`),
+      const res = await api.get(
+        `/api/parent/dashboard/absent-records?studentId=${selectedChild.studentId}&year=${selectedYear}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
       

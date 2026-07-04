@@ -4,9 +4,9 @@ import axios from 'axios';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { apiUrl } from './api';
+import { APP_URL } from './api';
 
-axios.defaults.baseURL = apiUrl();
+axios.defaults.baseURL = APP_URL;
 axios.interceptors.request.use((config) => {
   if (typeof config.url === 'string') {
     config.url = config.url.replace(/^https?:\/\/localhost:8000/i, '');

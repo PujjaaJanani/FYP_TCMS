@@ -32,7 +32,8 @@ class AuthController extends Controller
         $authority = Authority::where('email', $email)->first();
 
         if ($authority && Hash::check($password, $authority->password)) {
-            $token = $authority->createToken('auth-token', ['authority'])->plainTextToken;
+            $abilities = ['authority', strtolower($authority->role)]; // e.g. ['authority','admin'] or ['authority','staff']
+            $token = $authority->createToken('auth-token', $abilities)->plainTextToken;
 
             return response()->json([
                 'success' => true,

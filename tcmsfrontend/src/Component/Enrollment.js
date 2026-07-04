@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Select, Card, Space, message, Steps, Alert, Spin, Modal } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { DeleteOutlined, PlusOutlined, UserOutlined, MailOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api/axios';
 import Header from '../Layout/Header';
 import { apiUrl } from '../api';
 import './Enrollment.css';
@@ -35,7 +35,7 @@ const Enrollment = () => {
 
   const fetchSubjects = async () => {
     try {
-      const response = await axios.get(apiUrl('/api/subjects'));
+      const response = await api.get('/api/subjects');
       if (response.data.success) {
         setSubjects(response.data.data);
       }
@@ -47,7 +47,7 @@ const Enrollment = () => {
 
   const fetchCurrentYearClasses = async () => {
     try {
-      const response = await axios.get(apiUrl('/api/enrollment/current-year-classes'));
+      const response = await api.get('/api/enrollment/current-year-classes');
       if (response.data.success) {
         setAcademicYear(response.data.academic_year);
       }
@@ -61,7 +61,7 @@ const Enrollment = () => {
     setAvailableClasses([]);
     
     try {
-      const response = await axios.get(apiUrl(`/api/enrollment/classes/by-subject/${subjectId}`));
+      const response = await api.get(`/api/enrollment/classes/by-subject/${subjectId}`);
       if (response.data.success) {
         const all = response.data.data;
         if (all.length === 0) {
@@ -143,7 +143,7 @@ const Enrollment = () => {
   const handleCheckStudent = async (values) => {
     setLoading(true);
     try {
-      const response = await axios.post(apiUrl('/api/enrollment/check-student'), {
+      const response = await api.post('/api/enrollment/check-student', {
         email: values.email
       });
 
@@ -199,7 +199,7 @@ const Enrollment = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post(apiUrl('/api/enrollment/submit'), {
+      const response = await api.post('/api/enrollment/submit', {
         studentId: student.studentId,
         classes: selectedClasses.map(c => c.classId)
       });

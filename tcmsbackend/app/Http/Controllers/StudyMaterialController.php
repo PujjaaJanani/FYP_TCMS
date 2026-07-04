@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Authority;
+use App\Models\Registration;
+use App\Models\Student;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -10,6 +13,85 @@ use Illuminate\Support\Facades\Storage;
 
 class StudyMaterialController extends Controller
 {
+    private function getAccessibleClassIds(Request $request, ?int $academicYear = null): ?array
+    {
+        $user = $request->user();
+        $academicYear = $academicYear ?? (int) date('Y');
+
+        if ($user instanceof Authority) {
+            if ($user->role === 'Admin') {
+                return null; // Admin can access all classes/materials
+            }
+
+            return DB::table('class')
+                ->where('authorityId', $user->authorityId)
+                ->where('academicYear', $academicYear)
+                ->pluck('classId')
+                ->map(fn ($classId) => (int) $classId)
+                ->toArray();
+        }
+
+        if ($request->user()->tokenCan('parent')) {
+            $linkedStudentIds = Student::where('parentEmail', $user->parentEmail)
+                ->pluck('studentId');
+
+            $registrations = Registration::whereIn('studentId', $linkedStudentIds)
+                ->where('status', 'Approved')
+                ->where('enrollmentYear', $academicYear)
+                ->get();
+
+            $classIds = [];
+            foreach ($registrations as $registration) {
+                if (!empty($registration->classId)) {
+                    $classIds[] = (int) $registration->classId;
+                }
+                if (!empty($registration->classIds)) {
+                    $classIds = array_merge(
+                        $classIds,
+                        array_map('intval', array_filter(array_map('trim', explode(',', $registration->classIds))))
+                    );
+                }
+            }
+
+            return array_values(array_unique($classIds));
+        }
+
+        if ($user instanceof Student) {
+            $registrations = Registration::where('studentId', $user->studentId)
+                ->where('status', 'Approved')
+                ->where('enrollmentYear', $academicYear)
+                ->get();
+
+            $classIds = [];
+            foreach ($registrations as $registration) {
+                if (!empty($registration->classId)) {
+                    $classIds[] = (int) $registration->classId;
+                }
+                if (!empty($registration->classIds)) {
+                    $classIds = array_merge(
+                        $classIds,
+                        array_map('intval', array_filter(array_map('trim', explode(',', $registration->classIds))))
+                    );
+                }
+            }
+
+            return array_values(array_unique($classIds));
+        }
+
+        return [];
+    }
+
+    private function userCanAccessClass(Request $request, $classId, ?int $academicYear = null): bool
+    {
+        $allowedClassIds = $this->getAccessibleClassIds($request, $academicYear);
+
+        if ($allowedClassIds === null) {
+            return true;
+        }
+
+        return in_array((int) $classId, $allowedClassIds, true);
+    }
+
     /**
      * GET /api/student/study-materials/my-classes
      * Get classes that the student is registered for
@@ -161,14 +243,21 @@ class StudyMaterialController extends Controller
     public function getClassMaterials($classId, Request $request)
     {
         try {
+            $academicYear = (int) ($request->query('academicYear') ?: date('Y'));
+
+            if (!$this->userCanAccessClass($request, $classId, $academicYear)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $query = DB::table('studymaterial')
                 ->leftJoin('authority', 'studymaterial.authorityId', '=', 'authority.authorityId')
                 ->where('studymaterial.classId', $classId);
 
             // Optional academic year filter
-            if ($request->has('academicYear') && !empty($request->academicYear)) {
-                $query->where('studymaterial.academicYear', $request->academicYear);
-            }
+            $query->where('studymaterial.academicYear', $academicYear);
 
             $materials = $query->select(
                 'studymaterial.*',
@@ -210,6 +299,9 @@ class StudyMaterialController extends Controller
     public function getAllMaterials(Request $request)
     {
         try {
+            $academicYear = (int) ($request->query('academicYear') ?: date('Y'));
+            $allowedClassIds = $this->getAccessibleClassIds($request, $academicYear);
+
             $query = DB::table('studymaterial')
                 ->join('class', 'studymaterial.classId', '=', 'class.classId')
                 ->join('subject', 'class.subjectId', '=', 'subject.subjectId')
@@ -221,9 +313,17 @@ class StudyMaterialController extends Controller
                     'authority.name as uploadedBy'
                 );
 
-            // Optional academic year filter
-            if ($request->has('academicYear') && !empty($request->academicYear)) {
-                $query->where('studymaterial.academicYear', $request->academicYear);
+            $query->where('studymaterial.academicYear', $academicYear);
+
+            if ($allowedClassIds !== null) {
+                if (empty($allowedClassIds)) {
+                    return response()->json([
+                        'success' => true,
+                        'data' => []
+                    ], 200);
+                }
+
+                $query->whereIn('class.classId', $allowedClassIds);
             }
 
             $materials = $query->orderBy('studymaterial.uploadedAt', 'desc')
@@ -287,6 +387,13 @@ class StudyMaterialController extends Controller
                     'success' => false,
                     'message' => 'Material not found'
                 ], 404);
+            }
+
+            if (!$this->userCanAccessClass(request(), $material->classId, (int) $material->academicYear)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
             }
 
             return response()->json([

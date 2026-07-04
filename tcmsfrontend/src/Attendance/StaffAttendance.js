@@ -8,7 +8,7 @@ import {
   ReloadOutlined, CheckSquareOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 
@@ -24,7 +24,7 @@ const StaffAttendance = () => {
   const fetchMyClasses = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(apiUrl('/api/attendance/my-classes'), {
+      const res = await api.get('/api/attendance/my-classes', {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       if (res.data.success) {

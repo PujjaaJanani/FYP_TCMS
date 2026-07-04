@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Form, Input, Button, message } from 'antd';
 import { MailOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { apiUrl } from '../api';
 import './ForgotPassword.css';
 
@@ -15,7 +15,7 @@ const ForgotPassword = () => {
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const response = await axios.post(apiUrl('/api/auth/forgot-password'), {
+      const response = await api.post('/api/auth/forgot-password', {
         email: values.email,
       });
 

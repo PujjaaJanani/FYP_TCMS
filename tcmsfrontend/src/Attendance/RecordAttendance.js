@@ -29,6 +29,7 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import api from "../api/axios";
 import axios from "axios";
 import { getToken, getUser } from "../Utils/LocalStorage";
 import dayjs from "dayjs";
@@ -75,8 +76,8 @@ const RecordAttendance = () => {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        apiUrl(`/api/attendance/class/${classId}/students`),
+      const res = await api.get(
+        `/api/attendance/class/${classId}/students`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -106,8 +107,8 @@ const RecordAttendance = () => {
   const fetchHistory = async () => {
     setHistoryLoading(true);
     try {
-      const res = await axios.get(
-        apiUrl(`/api/attendance/class/${classId}/history`),
+      const res = await api.get(
+        `/api/attendance/class/${classId}/history`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -130,8 +131,8 @@ const RecordAttendance = () => {
     setIsEditing(false);
 
     try {
-      const res = await axios.get(
-        apiUrl(`/api/attendance/class/${classId}/date/${date}`),
+      const res = await api.get(
+        `/api/attendance/class/${classId}/date/${date}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -185,8 +186,8 @@ const RecordAttendance = () => {
         }),
       );
 
-      const res = await axios.post(
-        apiUrl('/api/attendance/submit'),
+      const res = await api.post(
+        '/api/attendance/submit',
         {
           classId: parseInt(classId),
           authorityId: parseInt(user.id),
@@ -224,8 +225,8 @@ const RecordAttendance = () => {
       cancelText: "Cancel",
       onOk: async () => {
         try {
-          const res = await axios.delete(
-            apiUrl(`/api/attendance/class/${classId}/date/${date}`),
+          const res = await api.delete(
+            `/api/attendance/class/${classId}/date/${date}`,
             { headers: { Authorization: `Bearer ${getToken()}` } },
           );
 
@@ -310,8 +311,8 @@ const RecordAttendance = () => {
         }),
       );
 
-      const res = await axios.post(
-        apiUrl('/api/attendance/submit'),
+      const res = await api.post(
+        '/api/attendance/submit',
         {
           classId: parseInt(classId),
           authorityId: parseInt(user.id),

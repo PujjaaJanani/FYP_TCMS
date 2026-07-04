@@ -67,8 +67,8 @@ const Header = () => {
             HOME
           </Link>
           <Link 
-            to="/student/schedule" 
-            className={`nav-link ${isActive('/student/schedule') ? 'active' : ''}`}
+            to="/class-schedule" 
+            className={`nav-link ${isActive('/class-schedule') ? 'active' : ''}`}
           >
             CLASS SCHEDULE
           </Link>
@@ -120,8 +120,8 @@ const Header = () => {
           HOME
         </Link>
         <Link 
-          to="/student/schedule" 
-          className={`mobile-nav-link ${isActive('/student/schedule') ? 'active' : ''}`} 
+          to="/class-schedule" 
+          className={`mobile-nav-link ${isActive('/class-schedule') ? 'active' : ''}`} 
           onClick={closeMobileMenu}
         >
           CLASS SCHEDULE

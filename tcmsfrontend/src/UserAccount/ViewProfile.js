@@ -11,7 +11,7 @@ import {
   TeamOutlined,
   DollarOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 
@@ -38,8 +38,8 @@ const ViewProfile = () => {
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        apiUrl('/api/profile'),
+      const res = await api.get(
+        '/api/profile',
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
@@ -96,8 +96,8 @@ const ViewProfile = () => {
 
       setSaving(true);
       try {
-        const res = await axios.put(
-          apiUrl('/api/profile'),
+        const res = await api.put(
+          '/api/profile',
           {
             parentEmail: form.parentEmail,
             ...(form.password && { parentPassword: form.password })
@@ -153,8 +153,8 @@ const ViewProfile = () => {
         ...(form.password && { password: form.password })
       };
 
-      const res = await axios.put(
-        apiUrl('/api/profile'),
+      const res = await api.put(
+        '/api/profile',
         payload,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
@@ -194,8 +194,8 @@ const ViewProfile = () => {
       const formData = new FormData();
       formData.append('profilePicture', file);
 
-      const res = await axios.post(
-        apiUrl('/api/profile/upload-picture'),
+      const res = await api.post(
+        '/api/profile/upload-picture',
         formData,
         {
           headers: {
@@ -226,8 +226,8 @@ const ViewProfile = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          const res = await axios.delete(
-            apiUrl('/api/profile/delete-picture'),
+          const res = await api.delete(
+            '/api/profile/delete-picture',
             { headers: { Authorization: `Bearer ${getToken()}` } }
           );
 

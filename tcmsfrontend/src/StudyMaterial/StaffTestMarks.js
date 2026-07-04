@@ -34,6 +34,7 @@ import {
   InfoCircleOutlined
 } from "@ant-design/icons";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import api from "../api/axios";
 import axios from "axios";
 import { getToken } from "../Utils/LocalStorage";
 import dayjs from "dayjs";
@@ -130,8 +131,8 @@ const StaffTestMarks = () => {
       data: [],
     });
     try {
-      const res = await axios.get(
-        apiUrl(`/api/testmarks/class/${classId}/student/${studentId}/history`),
+      const res = await api.get(
+        `/api/testmarks/class/${classId}/student/${studentId}/history`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
       if (res.data.success) {
@@ -161,11 +162,11 @@ const StaffTestMarks = () => {
     setLoading(true);
     try {
       const [testsRes, studentsRes] = await Promise.all([
-        axios.get(apiUrl(`/api/testmarks/class/${classId}`), {
+        api.get(`/api/testmarks/class/${classId}`, {
           headers: { Authorization: `Bearer ${getToken()}` },
         }),
-        axios.get(
-          apiUrl(`/api/testmarks/class/${classId}/students`),
+        api.get(
+          `/api/testmarks/class/${classId}/students`,
           {
             headers: { Authorization: `Bearer ${getToken()}` },
           },
@@ -214,13 +215,13 @@ const StaffTestMarks = () => {
 
       let res;
       if (editingTest) {
-        res = await axios.put(
-          apiUrl(`/api/testmarks/${classId}/${encodeURIComponent(editingTest.testName)}/${editingTest.testDate}`),
+        res = await api.put(
+          `/api/testmarks/${classId}/${encodeURIComponent(editingTest.testName)}/${editingTest.testDate}`,
           payload,
           { headers: { Authorization: `Bearer ${getToken()}` } },
         );
       } else {
-        res = await axios.post(apiUrl("/api/testmarks"), payload, {
+        res = await api.post("/api/testmarks", payload, {
           headers: { Authorization: `Bearer ${getToken()}` },
         });
       }
@@ -244,8 +245,8 @@ const StaffTestMarks = () => {
   // Handle deleting a test
   const handleDeleteTest = async (testName, testDate) => {
     try {
-      const res = await axios.delete(
-        apiUrl(`/api/testmarks/${classId}/${encodeURIComponent(testName)}/${testDate}`),
+      const res = await api.delete(
+        `/api/testmarks/${classId}/${encodeURIComponent(testName)}/${testDate}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 

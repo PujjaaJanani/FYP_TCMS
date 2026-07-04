@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Drawer } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { 
   HomeOutlined, 
   UserOutlined, 
@@ -16,7 +17,6 @@ import {
   MenuOutlined,
   CloseOutlined
 } from '@ant-design/icons';
-import { getUserType, getRole, clearAuth } from '../Utils/LocalStorage';
 import './Sidebar.css';
 
 const { Sider } = Layout;
@@ -28,11 +28,12 @@ function getItem(label, key, icon, onClick, children) {
 const Sidebar = ({ collapsed, toggleCollapse }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const userType = getUserType();
-  const role = getRole();
+  const userType = user?.userType;
+  const role = user?.role;
 
   // Check screen size on mount and on resize
   useEffect(() => {
@@ -72,8 +73,8 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
 
   const getSelectedKey = () => {
     const path = location.pathname;
-    const currentUserType = getUserType();
-    const currentRole = getRole();
+    const currentUserType = user?.userType;
+    const currentRole = user?.role;
     
     if (path === '/profile') {
       if (currentUserType === 'authority') {
@@ -117,10 +118,7 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     getItem('Home',            'admin-1', <HomeOutlined />,     () => navigate('/admin/dashboard')),
     getItem('User Management', 'admin-2', <TeamOutlined />,     () => navigate('/admin/users')),
     getItem('Class Schedule',  'admin-3', <CalendarOutlined />, () => navigate('/authority/schedule')),
-    getItem('Logout',          'admin-4', <LogoutOutlined />,   () => {
-      clearAuth();
-      navigate('/login');
-    }),
+    getItem('Logout',          'admin-4', <LogoutOutlined />,   () => { void logout(); }),
   ];
 
   const staffItems = [
@@ -131,10 +129,7 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     getItem('Attendance',     'staff-5', <CheckSquareOutlined />,  () => navigate('/staff/attendance')),
     getItem('Payment',        'staff-6', <DollarOutlined />,   () => navigate('/staff/payments')),
     getItem('Study Material', 'staff-7', <BookOutlined />,     () => navigate('/staff/materials')),
-    getItem('Logout',         'staff-8', <LogoutOutlined />,   () => {
-      clearAuth();
-      navigate('/login');
-    }),
+    getItem('Logout',         'staff-8', <LogoutOutlined />,   () => { void logout(); }),
   ];
 
   const studentItems = [
@@ -142,20 +137,14 @@ const Sidebar = ({ collapsed, toggleCollapse }) => {
     getItem('Profile',        'student-2', <UserOutlined />,     () => navigate('/profile')),
     getItem('Class Schedule', 'student-3', <CalendarOutlined />, () => navigate('/student/schedule')),
     getItem('Study Material', 'student-5', <BookOutlined />,     () => navigate('/student/materials')),
-    getItem('Logout',         'student-6', <LogoutOutlined />,   () => {
-      clearAuth();
-      navigate('/login');
-    }),
+    getItem('Logout',         'student-6', <LogoutOutlined />,   () => { void logout(); }),
   ];
 
   const parentItems = [
     getItem('Dashboard',      'parent-2', <DashboardOutlined />, () => navigate('/parent/dashboard')),
     getItem('Profile',        'parent-1', <UserOutlined />,      () => navigate('/profile')),
     getItem('Payment',        'parent-3', <DollarOutlined />,    () => navigate('/parent/payment')),
-    getItem('Logout',         'parent-4', <LogoutOutlined />,    () => {
-      clearAuth();
-      navigate('/login');
-    }),
+    getItem('Logout',         'parent-4', <LogoutOutlined />,    () => { void logout(); }),
   ];
 
   const getMenuItems = () => {

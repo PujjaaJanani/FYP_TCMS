@@ -39,6 +39,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import api from "../api/axios";
 import axios from "axios";
 import { getToken, getUserType } from "../Utils/LocalStorage";
 import { apiUrl } from "../api";
@@ -68,7 +69,7 @@ const ViewDashboard = () => {
   const fetchDashboardStats = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(apiUrl("/api/dashboard/stats"), {
+      const res = await api.get("/api/dashboard/stats", {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
 

@@ -7,7 +7,7 @@ import {
   ReloadOutlined, FolderOpenOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken, getUser } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 
@@ -23,7 +23,7 @@ const StaffClasses = () => {
   const fetchMyClasses = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(apiUrl('/api/study-materials/my-classes'), {
+      const res = await api.get('/api/study-materials/my-classes', {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       if (res.data.success) {

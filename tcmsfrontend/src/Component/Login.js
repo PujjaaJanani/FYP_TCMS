@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, message, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { saveAuth } from '../Utils/LocalStorage';
-import { apiUrl } from '../api';
+import { useAuth } from '../context/AuthContext';
 import Header from '../Layout/Header';
 import './Login.css';
 
@@ -17,32 +15,25 @@ const Login = () => {
     isParent: false
   });
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const onFinish = async (values) => {
     setLoading(true);
 
     try {
-      const response = await axios.post(apiUrl('/api/login'), {
-        email: values.email,
-        password: values.password,
-      });
+      const user = await login(values.email, values.password);
+      message.success('Login successful!');
 
-      if (response.data.success) {
-        const { token, user } = response.data.data;
-        saveAuth(token, user);
-        message.success('Login successful!');
-
-        if (user.userType === 'authority') {
-          if (user.role === 'Admin') {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/staff/dashboard');
-          }
-        } else if (user.userType === 'parent') {
-          navigate('/parent/dashboard');
+      if (user.userType === 'authority') {
+        if (user.role === 'Admin') {
+          navigate('/admin/dashboard');
         } else {
-          navigate('/student/dashboard');
+          navigate('/staff/dashboard');
         }
+      } else if (user.userType === 'parent') {
+        navigate('/parent/dashboard');
+      } else {
+        navigate('/student/dashboard');
       }
     } catch (error) {
       if (error.response) {

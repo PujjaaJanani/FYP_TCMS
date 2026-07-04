@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 use App\Services\SMSService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Models\Authority;
+use App\Models\Student;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -12,6 +14,39 @@ use Illuminate\Support\Facades\Http;
 
 class PaymentController extends Controller
 {
+    private function userCanAccessPayment(Request $request, Payment $payment): bool
+    {
+        $user = $request->user();
+
+        if ($user instanceof Authority) {
+            return true;
+        }
+
+        if ($request->user()->tokenCan('parent')) {
+            $remark = json_decode($payment->remark, true) ?: [];
+            $parentEmail = $remark['parentEmail'] ?? null;
+
+            if (!$parentEmail || $parentEmail !== $user->parentEmail) {
+                return false;
+            }
+
+            return DB::table('registration')
+                ->join('student', 'registration.studentId', '=', 'student.studentId')
+                ->where('registration.registrationId', $payment->registrationId)
+                ->where('student.parentEmail', $user->parentEmail)
+                ->exists();
+        }
+
+        if ($user instanceof Student) {
+            return DB::table('registration')
+                ->where('registrationId', $payment->registrationId)
+                ->where('studentId', $user->studentId)
+                ->exists();
+        }
+
+        return false;
+    }
+
     private function getParentRegistrationsForYear($parentEmail, $year)
     {
         return DB::table('registration')
@@ -30,6 +65,13 @@ class PaymentController extends Controller
     {
         try {
             $user = $request->user();
+            if ($user instanceof Authority || !($user instanceof Student)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $year = $request->query('year', date('Y'));
 
             $isParent = $request->user()->tokenCan('parent');
@@ -438,8 +480,15 @@ class PaymentController extends Controller
             if (!$payment) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Payment not found'
+                'message' => 'Payment not found'
                 ], 404);
+            }
+
+            if (!$this->userCanAccessPayment($request, $payment)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
             }
 
             // If already paid, return success
@@ -706,6 +755,13 @@ class PaymentController extends Controller
     public function getAvailableYears()
     {
         try {
+            if (!(request()->user() instanceof Authority)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $years = DB::table('registration')
                 ->select('enrollmentYear')
                 ->where('status', 'Approved')
@@ -746,6 +802,14 @@ class PaymentController extends Controller
     public function getAllPayments(Request $request)
     {
         try {
+            $user = $request->user();
+            if (!($user instanceof Authority)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $year = $request->query('year', date('Y'));
             $month = $request->query('month', null);
             $status = $request->query('status', null);
@@ -906,6 +970,14 @@ class PaymentController extends Controller
     public function getPaymentStats(Request $request)
     {
         try {
+            $user = $request->user();
+            if (!($user instanceof Authority)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $year = $request->query('year', date('Y'));
             $month = $request->query('month', date('n'));
 
@@ -972,6 +1044,14 @@ class PaymentController extends Controller
     public function getAllStudentsPaymentStatus(Request $request)
     {
         try {
+            $user = $request->user();
+            if (!($user instanceof Authority)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $year = $request->query('year', date('Y'));
             $month = $request->query('month', date('n'));
 

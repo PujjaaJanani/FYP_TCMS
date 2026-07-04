@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Models\Authority;
 use App\Models\Attendance;
 use App\Models\Registration;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,24 @@ use Illuminate\Support\Facades\Log;
 
 class AttendanceController extends Controller
 {
+    private function authorityCanAccessClass(Request $request, $classId): bool
+    {
+        $user = $request->user();
+
+        if ($user instanceof Authority) {
+            if ($user->role === 'Admin') {
+                return true;
+            }
+
+            return DB::table('class')
+                ->where('classId', $classId)
+                ->where('authorityId', $user->authorityId)
+                ->exists();
+        }
+
+        return false;
+    }
+
     /**
      * Get all classes for the logged-in staff member for CURRENT ACADEMIC YEAR only
      */
@@ -66,6 +85,13 @@ class AttendanceController extends Controller
     public function getClassStudents($classId)
     {
         try {
+            if (!request()->user() instanceof Authority || !$this->authorityCanAccessClass(request(), $classId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $currentYear = date('Y');
 
             // Get all approved registrations for this class for current year only
@@ -198,6 +224,13 @@ class AttendanceController extends Controller
     public function getClassAttendanceHistory($classId)
     {
         try {
+            if (!request()->user() instanceof Authority || !$this->authorityCanAccessClass(request(), $classId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $currentYear = date('Y');
 
             $attendanceRecords = DB::table('attendance')
@@ -253,6 +286,13 @@ class AttendanceController extends Controller
     public function getAttendanceByDate($classId, $date)
     {
         try {
+            if (!request()->user() instanceof Authority || !$this->authorityCanAccessClass(request(), $classId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $currentYear = date('Y');
 
             $attendance = DB::table('attendance')
@@ -331,7 +371,7 @@ class AttendanceController extends Controller
     /**
      * Get attendance history for a class by academic year (archive view)
      */
-    public function getClassAttendanceHistoryByYear($classId, Request $request)
+public function getClassAttendanceHistoryByYear($classId, Request $request)
 {
     try {
         $academicYear = $request->query('academicYear');
@@ -341,6 +381,13 @@ class AttendanceController extends Controller
                 'success' => false,
                 'message' => 'Academic year is required'
             ], 422);
+        }
+
+        if (!($request->user() instanceof Authority) || !$this->authorityCanAccessClass($request, $classId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden'
+            ], 403);
         }
 
         // Add debug logging
@@ -424,6 +471,13 @@ class AttendanceController extends Controller
                     'success' => false,
                     'message' => 'Academic year is required'
                 ], 422);
+            }
+
+            if (!($request->user() instanceof Authority) || !$this->authorityCanAccessClass($request, $classId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
             }
 
             Log::info('Fetching attendance details archive', [

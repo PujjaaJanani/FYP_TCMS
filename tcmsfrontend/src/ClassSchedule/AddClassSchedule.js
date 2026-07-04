@@ -16,7 +16,7 @@ import {
   DeleteOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import dayjs from 'dayjs';
 import { getToken } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
@@ -49,7 +49,7 @@ const AddClassSchedule = () => {
 
   const fetchSubjects = async () => {
     try {
-      const res = await axios.get(apiUrl('/api/subjects/with-classes'), {
+      const res = await api.get('/api/subjects/with-classes', {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       if (res.data.success) setSubjects(res.data.data);
@@ -61,7 +61,7 @@ const AddClassSchedule = () => {
 
   const fetchTeachers = async () => {
     try {
-      const res = await axios.get(apiUrl('/api/teachers'), {
+      const res = await api.get('/api/teachers', {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       if (res.data.success) setTeachers(res.data.data);
@@ -146,8 +146,8 @@ const AddClassSchedule = () => {
     // Update permanent subject via API
     setUpdatingSubject(true);
     try {
-      const res = await axios.put(
-        apiUrl(`/api/subjects/${editingSubject.subjectId}`),
+      const res = await api.put(
+        `/api/subjects/${editingSubject.subjectId}`,
         {
           name: editingSubject.name,
           form: editingSubject.form,
@@ -221,8 +221,8 @@ const AddClassSchedule = () => {
     setCreatingTeacher(true);
     try {
       // Create teacher in database immediately
-      const res = await axios.post(
-        apiUrl('/api/teachers'),
+      const res = await api.post(
+        '/api/teachers',
         newTeacher,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
@@ -279,8 +279,8 @@ const AddClassSchedule = () => {
         requestData.subjectId = selectedSubjectId;
       }
 
-      const res = await axios.post(
-        apiUrl('/api/classes/schedule'),
+      const res = await api.post(
+        '/api/classes/schedule',
         requestData,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );

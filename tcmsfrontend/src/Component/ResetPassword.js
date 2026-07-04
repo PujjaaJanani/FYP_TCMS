@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Form, Input, Button, message } from "antd";
 import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios";
 import { apiUrl } from "../api";
 import "./ResetPassword.css";
 
@@ -26,8 +26,8 @@ const ResetPassword = () => {
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
-      const response = await axios.post(
-        apiUrl('/api/auth/reset-password'),
+      const response = await api.post(
+        '/api/auth/reset-password',
         {
           email: email,
           token: token,

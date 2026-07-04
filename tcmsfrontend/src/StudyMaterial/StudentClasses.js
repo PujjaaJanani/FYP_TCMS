@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { Empty } from 'antd';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken, getUserType } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 
@@ -25,8 +25,8 @@ const StudentClasses = () => {
   const fetchStudentClasses = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        apiUrl('/api/student/study-materials/my-classes'),
+      const res = await api.get(
+        '/api/student/study-materials/my-classes',
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
       

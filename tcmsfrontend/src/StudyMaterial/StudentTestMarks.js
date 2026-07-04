@@ -9,7 +9,7 @@ import {
   FileTextOutlined
 } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken, getUser } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 
@@ -20,7 +20,7 @@ const StudentTestMarks = () => {
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
-  const [studentInfo, setStudentInfo] = useState(null);
+  const [studentId, setStudentId] = useState(null);
   
   const navigate = useNavigate();
   const { classId } = useParams();
@@ -37,28 +37,13 @@ const StudentTestMarks = () => {
     try {
       const currentYear = new Date().getFullYear();
 
-      // First get the student's registration for this class
-      const studentRes = await axios.get(
-        apiUrl(`/api/testmarks/class/${classId}/students`),
-        { headers: { Authorization: `Bearer ${getToken()}` } }
-      );
-
-      if (studentRes.data.success) {
-        // Find the student that matches the current user's email
-        // Assuming the user object contains email or student info
-        const student = studentRes.data.data.find(s => 
-          s.studentName?.toLowerCase().includes(currentUser?.name?.toLowerCase()) ||
-          s.email === currentUser?.email
-        );
-        
-        if (student) {
-          setStudentInfo(student);
-        }
+      if (currentUser?.userType === 'student') {
+        setStudentId(currentUser.id);
       }
 
       // Get all tests for this class
-      const testsRes = await axios.get(
-        apiUrl(`/api/testmarks/class/${classId}?academicYear=${currentYear}`),
+      const testsRes = await api.get(
+        `/api/testmarks/class/${classId}?academicYear=${currentYear}`,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
@@ -80,8 +65,8 @@ const StudentTestMarks = () => {
 
   // Get student's mark for a specific test
   const getStudentMark = (test) => {
-    if (!studentInfo) return null;
-    const studentMark = test.marks.find(m => m.registrationId === studentInfo.registrationId);
+    if (!studentId) return null;
+    const studentMark = test.marks.find(m => Number(m.studentId) === Number(studentId));
     return studentMark ? studentMark.mark : null;
   };
 
@@ -167,7 +152,7 @@ const StudentTestMarks = () => {
         </Button>
       </Flex>
 
-      {!studentInfo && !loading && (
+      {!studentId && !loading && (
         <Card style={{ marginBottom: 16 }}>
           <Empty 
             description="No student record found for this class"

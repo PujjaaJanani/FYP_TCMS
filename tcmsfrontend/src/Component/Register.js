@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Select, message, Steps, Card, Space } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api/axios';
 import Header from '../Layout/Header';
 import { apiUrl } from '../api';
 import './Register.css';
@@ -27,7 +27,7 @@ const Register = () => {
 
   const fetchSubjects = async () => {
     try {
-      const response = await axios.get(apiUrl('/api/subjects'));
+      const response = await api.get('/api/subjects');
       if (response.data.success) {
         setSubjects(response.data.data);
       }
@@ -39,7 +39,7 @@ const Register = () => {
   const fetchClassesBySubject = async (subjectId) => {
     setClassesStatus(null);
     try {
-      const response = await axios.get(apiUrl(`/api/classes/by-subject/${subjectId}`));
+      const response = await api.get(`/api/classes/by-subject/${subjectId}`);
       if (response.data.success) {
         const all = response.data.data;
         if (all.length === 0) {
@@ -161,8 +161,8 @@ const Register = () => {
         classes: selectedClasses.map(c => c.classId)
       };
 
-      const response = await axios.post(
-        apiUrl('/api/register'),
+      const response = await api.post(
+        '/api/register',
         registrationData,
         {
           headers: {

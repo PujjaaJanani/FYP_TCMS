@@ -1,4 +1,5 @@
 export const APP_URL = (process.env.REACT_APP_APP_URL || 'http://localhost:8000').replace(/\/$/, '');
+export const API_URL = `${APP_URL}/api`;
 
 export const apiUrl = (path = '') => {
   if (!path) {

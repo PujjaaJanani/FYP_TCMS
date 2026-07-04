@@ -7,24 +7,106 @@ use Illuminate\Http\Request;
 use App\Models\TestMark;
 use App\Models\Registration;
 use App\Models\Student;
+use App\Models\Authority;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class TestMarkController extends Controller
 {
+    private function authorityCanAccessClass(Request $request, $classId): bool
+    {
+        $user = $request->user();
+
+        if ($user instanceof Authority) {
+            if ($user->role === 'Admin') {
+                return true;
+            }
+
+            return DB::table('class')
+                ->where('classId', $classId)
+                ->where('authorityId', $user->authorityId)
+                ->exists();
+        }
+
+        return false;
+    }
+
+    private function userCanAccessClass(Request $request, $classId, ?int $academicYear = null): bool
+    {
+        $user = $request->user();
+        $academicYear = $academicYear ?? (int) date('Y');
+
+        if ($user instanceof Authority) {
+            return $this->authorityCanAccessClass($request, $classId);
+        }
+
+        if ($request->user()->tokenCan('parent')) {
+            $linkedStudentIds = Student::where('parentEmail', $user->parentEmail)
+                ->pluck('studentId');
+
+            return Registration::whereIn('studentId', $linkedStudentIds)
+                ->where('status', 'Approved')
+                ->where('enrollmentYear', $academicYear)
+                ->where(function ($query) use ($classId) {
+                    $query->where('classId', $classId)
+                        ->orWhere('classIds', 'LIKE', "%{$classId}%");
+                })
+                ->exists();
+        }
+
+        if ($user instanceof Student) {
+            return Registration::where('studentId', $user->studentId)
+                ->where('status', 'Approved')
+                ->where('enrollmentYear', $academicYear)
+                ->where(function ($query) use ($classId) {
+                    $query->where('classId', $classId)
+                        ->orWhere('classIds', 'LIKE', "%{$classId}%");
+                })
+                ->exists();
+        }
+
+        return false;
+    }
+
+    private function userCanAccessStudent(Request $request, $studentId): bool
+    {
+        $user = $request->user();
+
+        if ($user instanceof Authority) {
+            return true;
+        }
+
+        if ($request->user()->tokenCan('parent')) {
+            return Student::where('studentId', $studentId)
+                ->where('parentEmail', $user->parentEmail)
+                ->exists();
+        }
+
+        if ($user instanceof Student) {
+            return (int) $user->studentId === (int) $studentId;
+        }
+
+        return false;
+    }
+
     /**
      * Get all tests for a specific class (optionally filter by academic year)
      */
     public function getClassTests($classId, Request $request)
     {
         try {
-            $query = TestMark::select('testName', 'testDate', 'academicYear')
-                ->where('classId', $classId);
-            
-            // Optional academic year filter
-            if ($request->has('academicYear') && !empty($request->academicYear)) {
-                $query->where('academicYear', $request->academicYear);
+            $academicYear = (int) ($request->query('academicYear') ?: date('Y'));
+
+            if (!$this->userCanAccessClass($request, $classId, $academicYear)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
             }
+
+            $query = TestMark::select('testName', 'testDate', 'academicYear')
+                ->where('classId', $classId)
+                ->where('academicYear', $academicYear);
             
             $tests = $query->distinct()
                 ->orderBy('testDate', 'desc')
@@ -94,6 +176,20 @@ class TestMarkController extends Controller
     public function getClassStudents($classId)
     {
         try {
+            if (!request()->user() instanceof Authority) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
+            if (!($this->authorityCanAccessClass(request(), $classId))) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $currentYear = date('Y');
 
             // First get all approved registrations
@@ -299,6 +395,13 @@ class TestMarkController extends Controller
     public function getStudentHistory($classId, $studentId)
     {
         try {
+            if (!$this->userCanAccessStudent(request(), $studentId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             // Find the subjectId for the current class
             $subjectId = DB::table('class')
                 ->where('classId', $classId)
@@ -469,6 +572,14 @@ class TestMarkController extends Controller
                 ], 404);
             }
 
+            $request = request();
+            if (!$this->userCanAccessStudent($request, $mark->studentId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             // Get all marks for the same test
             $allMarks = TestMark::where('classId', $mark->classId)
                 ->where('testName', $mark->testName)
@@ -481,6 +592,17 @@ class TestMarkController extends Controller
                     'student.studentId'
                 )
                 ->get();
+
+            $user = request()->user();
+            if ($user instanceof Student && !request()->user()->tokenCan('parent')) {
+                $allMarks = $allMarks->where('studentId', $user->studentId)->values();
+            } elseif (request()->user()->tokenCan('parent')) {
+                $allMarks = $allMarks->filter(function ($item) use ($user) {
+                    return Student::where('studentId', $item->studentId)
+                        ->where('parentEmail', $user->parentEmail)
+                        ->exists();
+                })->values();
+            }
 
             return response()->json([
                 'success' => true,

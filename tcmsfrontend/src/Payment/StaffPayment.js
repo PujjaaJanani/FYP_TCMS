@@ -8,7 +8,7 @@ import {
   ClockCircleOutlined, LeftOutlined, RightOutlined, 
   ReloadOutlined, SearchOutlined, UserOutlined, CalendarOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken } from '../Utils/LocalStorage';
 import moment from 'moment';
 import { apiUrl } from '../api';
@@ -50,8 +50,8 @@ const StaffPayment = () => {
   // Fetch available years
   const fetchAvailableYears = async () => {
     try {
-      const res = await axios.get(
-        apiUrl('/api/payments/available-years'),
+      const res = await api.get(
+        '/api/payments/available-years',
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
       if (res.data.success) {
@@ -71,8 +71,8 @@ const StaffPayment = () => {
   const fetchStudentsPaymentStatus = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        apiUrl(`/api/staff/payments/students-month?year=${year}&month=${month}`),
+      const res = await api.get(
+        `/api/staff/payments/students-month?year=${year}&month=${month}`,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
@@ -211,8 +211,8 @@ const StaffPayment = () => {
           : null
       };
 
-      const res = await axios.post(
-        apiUrl('/api/staff/payments/student-payment'),
+          const res = await api.post(
+        '/api/staff/payments/student-payment',
         payload,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );

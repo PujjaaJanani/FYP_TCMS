@@ -14,6 +14,7 @@ import {
   FileTextOutlined
 } from "@ant-design/icons";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import api from "../api/axios";
 import axios from "axios";
 import { getToken } from "../Utils/LocalStorage";
 import dayjs from "dayjs";
@@ -47,10 +48,10 @@ const PastClassAcademicView = () => {
     try {
       console.log('Fetching materials for archive:', { classId, academicYear });
       const [matRes, testRes] = await Promise.all([
-        axios.get(apiUrl(`/api/study-materials/class/${classId}?academicYear=${academicYear}`), {
+        api.get(`/api/study-materials/class/${classId}?academicYear=${academicYear}`, {
           headers: { Authorization: `Bearer ${getToken()}` },
         }),
-        axios.get(apiUrl(`/api/testmarks/class/${classId}?academicYear=${academicYear}`), {
+        api.get(`/api/testmarks/class/${classId}?academicYear=${academicYear}`, {
           headers: { Authorization: `Bearer ${getToken()}` },
         }),
       ]);

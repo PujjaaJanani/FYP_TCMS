@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Table, Button, Modal, message, Select, Space, Flex, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 
@@ -35,8 +35,8 @@ const UserManagement = () => {
 
   const fetchAvailableYears = async () => {
     try {
-      const res = await axios.get(
-        apiUrl('/api/users/available-years'),
+      const res = await api.get(
+        '/api/users/available-years',
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
       console.log('Available years response:', res.data);
@@ -69,8 +69,8 @@ const UserManagement = () => {
     setLoading(true);
     try {
       console.log(`Fetching users for year: ${selectedYear}`);
-      const res = await axios.get(
-        apiUrl(`/api/users?year=${selectedYear}`),
+      const res = await api.get(
+        `/api/users?year=${selectedYear}`,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
@@ -143,8 +143,8 @@ const UserManagement = () => {
       cancelText: 'Cancel',
       onOk: async () => {
         try {
-          const res = await axios.delete(
-            apiUrl(`/api/users/${record.userType}/${record.id}`),
+          const res = await api.delete(
+            `/api/users/${record.userType}/${record.id}`,
             { headers: { Authorization: `Bearer ${getToken()}` } }
           );
 

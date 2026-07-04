@@ -27,6 +27,7 @@ import {
   DollarOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import api from "../api/axios";
 import axios from "axios";
 import {
   getToken,
@@ -62,8 +63,8 @@ const ViewClassSchedule = () => {
   // Fetch available years for filter
   const fetchAvailableYears = async () => {
     try {
-      const res = await axios.get(
-        apiUrl("/api/classes/available-years"),
+      const res = await api.get(
+        "/api/classes/available-years",
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -83,40 +84,73 @@ const ViewClassSchedule = () => {
     }
   };
 
-  const fetchClasses = async () => {
-    setLoading(true);
-    try {
-      let url = apiUrl("/api/classes/schedule");
+  // In ViewClassSchedule.js - Replace the fetchClasses function
 
-      // Add year filter for admin/staff
-      if (isAdminOrStaff && filterYear) {
+const fetchClasses = async () => {
+  setLoading(true);
+  try {
+    let res;
+    const token = getToken();
+    const userType = getUserType();
+    const role = getRole();
+    
+    // Determine if user is staff/admin (authority)
+    const isAuthority = userType === 'authority' && (role === 'Admin' || role === 'Staff');
+    const isStudent = userType === 'student';
+    const isParent = userType === 'parent';
+    
+    console.log('🔍 Fetching classes - User type:', userType);
+    console.log('🔍 Is Authority:', isAuthority);
+    console.log('🔍 Has token:', !!token);
+    
+    if (isAuthority && token) {
+      // Staff/Admin use protected endpoint with year filter
+      let url = "/api/classes/schedule";
+      if (filterYear) {
         url += `?year=${filterYear}`;
       }
-
-      let res;
-      if (loggedIn) {
-        res = await axios.get(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } else {
-        res = await axios.get(
-          apiUrl("/api/classes/schedule/public"),
-        );
-      }
-
-      if (res.data.success) {
-        setClasses(res.data.data);
-      } else {
-        message.error(res.data.message || "Failed to load classes");
-      }
-    } catch (error) {
-      console.error("Failed to load classes:", error);
-      message.error("Failed to load classes");
-    } finally {
-      setLoading(false);
-      setPageLoading(false);
+      console.log('📡 Using staff/admin endpoint:', url);
+      res = await api.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } else {
+      // Students, Parents, and Public users use public endpoint
+      console.log('📡 Using public endpoint: /api/classes/schedule/public');
+      res = await api.get("/api/classes/schedule/public");
     }
-  };
+
+    if (res.data.success) {
+      console.log('✅ Classes loaded:', res.data.data?.length || 0);
+      setClasses(res.data.data || []);
+    } else {
+      message.error(res.data.message || "Failed to load classes");
+    }
+  } catch (error) {
+    console.error('❌ Failed to load classes:', error);
+    if (error.response?.status === 404) {
+      message.warning("No class schedule available");
+      setClasses([]);
+    } else if (error.response?.status === 401) {
+      // If unauthorized, try public endpoint as fallback
+      try {
+        console.log('🔄 Fallback: Trying public endpoint');
+        const fallbackRes = await api.get("/api/classes/schedule/public");
+        if (fallbackRes.data.success) {
+          setClasses(fallbackRes.data.data || []);
+          return;
+        }
+      } catch (fallbackError) {
+        console.error('❌ Fallback failed:', fallbackError);
+      }
+      message.error("Please login to view full schedule");
+    } else {
+      message.error("Failed to load classes");
+    }
+  } finally {
+    setLoading(false);
+    setPageLoading(false);
+  }
+};
 
   useEffect(() => {
     if (isAdminOrStaff) {
@@ -148,8 +182,8 @@ const ViewClassSchedule = () => {
       okType: "danger",
       onOk: async () => {
         try {
-          const res = await axios.delete(
-            apiUrl(`/api/classes/schedule/${classId}`),
+          const res = await api.delete(
+            `/api/classes/schedule/${classId}`,
             { headers: { Authorization: `Bearer ${getToken()}` } },
           );
           if (res.data.success) {

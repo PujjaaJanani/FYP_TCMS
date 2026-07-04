@@ -4,7 +4,7 @@ import {
 } from 'antd';
 import { ArrowLeftOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken, getUser } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 
@@ -54,10 +54,10 @@ const EditMaterial = () => {
     setPageLoading(true);
     try {
       const [classesRes, materialRes] = await Promise.all([
-        axios.get(apiUrl('/api/study-materials/my-classes'), {
+        api.get('/api/study-materials/my-classes', {
           headers: { Authorization: `Bearer ${getToken()}` }
         }),
-        axios.get(apiUrl(`/api/study-materials/${materialId}`), {
+        api.get(`/api/study-materials/${materialId}`, {
           headers: { Authorization: `Bearer ${getToken()}` }
         })
       ]);
@@ -108,8 +108,8 @@ const EditMaterial = () => {
     }
 
     try {
-      const res = await axios.post(
-        apiUrl(`/api/study-materials/${materialId}?_method=PUT`),
+      const res = await api.post(
+        `/api/study-materials/${materialId}?_method=PUT`,
         formData,
         {
           headers: {

@@ -15,7 +15,7 @@ import {
   EditOutlined
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import dayjs from 'dayjs';
 import { getToken } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
@@ -47,13 +47,13 @@ const EditClassSchedule = () => {
   const fetchData = async () => {
     try {
       const [subjectsRes, teachersRes, classesRes] = await Promise.all([
-        axios.get(apiUrl('/api/subjects/with-classes'), {
+        api.get('/api/subjects/with-classes', {
           headers: { Authorization: `Bearer ${getToken()}` }
         }),
-        axios.get(apiUrl('/api/teachers'), {
+        api.get('/api/teachers', {
           headers: { Authorization: `Bearer ${getToken()}` }
         }),
-        axios.get(apiUrl('/api/classes/schedule'), {
+        api.get('/api/classes/schedule', {
           headers: { Authorization: `Bearer ${getToken()}` }
         })
       ]);
@@ -115,8 +115,8 @@ const EditClassSchedule = () => {
 
     // Create subject via API
     setCreatingTeacher(true); // Reusing state for subject creation
-    axios.post(
-      apiUrl('/api/subjects'),
+    api.post(
+      '/api/subjects',
       newSubject,
       { headers: { Authorization: `Bearer ${getToken()}` } }
     )
@@ -163,8 +163,8 @@ const EditClassSchedule = () => {
 
     setUpdatingSubject(true);
     try {
-      const res = await axios.put(
-        apiUrl(`/api/subjects/${editingSubject.subjectId}`),
+      const res = await api.put(
+        `/api/subjects/${editingSubject.subjectId}`,
         {
           name: editingSubject.name,
           form: editingSubject.form,
@@ -211,8 +211,8 @@ const EditClassSchedule = () => {
 
     setCreatingTeacher(true);
     try {
-      const res = await axios.post(
-        apiUrl('/api/teachers'),
+      const res = await api.post(
+        '/api/teachers',
         newTeacher,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
@@ -240,8 +240,8 @@ const EditClassSchedule = () => {
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const res = await axios.put(
-        apiUrl(`/api/classes/schedule/${classId}`),
+      const res = await api.put(
+        `/api/classes/schedule/${classId}`,
         {
           classDay: values.classDay,
           startTime: values.timeRange[0].format('HH:mm:ss'),

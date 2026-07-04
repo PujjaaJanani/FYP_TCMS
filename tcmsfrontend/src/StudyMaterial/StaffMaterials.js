@@ -11,7 +11,7 @@ import {
   BookOutlined, FileTextOutlined
 } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 import StaffTestMarks from './StaffTestMarks'; 
@@ -36,8 +36,8 @@ const StaffMaterials = () => {
   const fetchMaterials = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        apiUrl(`/api/study-materials/class/${classId}`),
+      const res = await api.get(
+        `/api/study-materials/class/${classId}`,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
       if (res.data.success) {
@@ -65,8 +65,8 @@ const StaffMaterials = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          const res = await axios.delete(
-            apiUrl(`/api/study-materials/${materialId}`),
+          const res = await api.delete(
+            `/api/study-materials/${materialId}`,
             { headers: { Authorization: `Bearer ${getToken()}` } }
           );
           if (res.data.success) {

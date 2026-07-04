@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Input, Select, Button, message, Radio, Checkbox, Spin } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 
@@ -190,7 +190,7 @@ const AddUser = () => {
   const fetchSubjects = async () => {
     setFetchingSubjects(true);
     try {
-      const res = await axios.get(apiUrl('/api/subjects'));
+      const res = await api.get('/api/subjects');
       console.log('Subjects API response:', res.data);
       
       let subjectsData = [];
@@ -216,7 +216,7 @@ const AddUser = () => {
   const fetchAllClasses = async () => {
     setFetchingClasses(true);
     try {
-      const res = await axios.get(apiUrl('/api/classes'));
+      const res = await api.get('/api/classes');
       console.log('All classes response:', res.data);
       
       let classesData = [];
@@ -336,8 +336,8 @@ const AddUser = () => {
 
       console.log('Submitting payload:', payload);
 
-      const res = await axios.post(
-        apiUrl('/api/users'),
+      const res = await api.post(
+        '/api/users',
         payload,
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );

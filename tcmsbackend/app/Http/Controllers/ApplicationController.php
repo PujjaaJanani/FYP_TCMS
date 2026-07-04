@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Authority;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +20,13 @@ class ApplicationController extends Controller
     public function getAllRegistrations()
     {
         try {
+            if (!(request()->user() instanceof Authority)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             Log::info('Fetching all registrations');
             
             $registrations = DB::table('registration')

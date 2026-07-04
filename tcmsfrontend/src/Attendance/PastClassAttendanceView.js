@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Card, Spin, Empty, Typography, Tag, Flex, Button, Modal, Table, message, Statistic, Row, Col, Avatar, Tooltip, Pagination } from "antd";
 import { ArrowLeftOutlined, EyeOutlined, CalendarOutlined, TeamOutlined, CheckCircleOutlined, CloseCircleOutlined, PieChartOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import api from "../api/axios";
 import axios from "axios";
 import { getToken } from "../Utils/LocalStorage";
 import dayjs from "dayjs";
@@ -33,8 +34,8 @@ const PastClassAttendanceView = () => {
     setLoading(true);
     try {
       console.log('Fetching attendance archive for:', { classId, academicYear });
-      const res = await axios.get(
-        apiUrl(`/api/attendance/archive/class/${classId}/history?academicYear=${academicYear}`),
+      const res = await api.get(
+        `/api/attendance/archive/class/${classId}/history?academicYear=${academicYear}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
       console.log('Attendance history response:', res.data);
@@ -74,11 +75,11 @@ const PastClassAttendanceView = () => {
       
       // Encode the date for URL safety
       const encodedDate = encodeURIComponent(dateValue);
-      const url = apiUrl(`/api/attendance/archive/class/${classId}/date/${encodedDate}?academicYear=${academicYear}`);
+      const url = `/api/attendance/archive/class/${classId}/date/${encodedDate}?academicYear=${academicYear}`;
       
       console.log('Request URL:', url);
       
-      const res = await axios.get(url, {
+      const res = await api.get(url, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       

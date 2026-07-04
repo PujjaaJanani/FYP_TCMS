@@ -16,7 +16,7 @@ import {
   LoadingOutlined,
   CalendarOutlined,
 } from "@ant-design/icons";
-import axios from "axios";
+import api from "../api/axios";
 import { getToken } from "../Utils/LocalStorage";
 import { apiUrl } from "../api";
 import ParentReceipt from "./ParentReceipt";
@@ -56,8 +56,8 @@ const ParentPayment = () => {
   const fetchPayments = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        apiUrl(`/api/payments/student?year=${year}`),
+      const res = await api.get(
+        `/api/payments/student?year=${year}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -85,8 +85,8 @@ const ParentPayment = () => {
   const verifyPayment = async (paymentId) => {
     setVerifying(true);
     try {
-      const res = await axios.get(
-        apiUrl(`/api/payments/verify/${paymentId}`),
+      const res = await api.get(
+        `/api/payments/verify/${paymentId}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -231,8 +231,8 @@ const ParentPayment = () => {
       onOk: async () => {
         setPaying(true);
         try {
-          const res = await axios.post(
-            apiUrl("/api/payments/create-intent"),
+          const res = await api.post(
+            "/api/payments/create-intent",
             {
               month: monthData.month,
               year: year,

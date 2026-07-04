@@ -14,12 +14,24 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
+    private function ensureAuthority(Request $request): bool
+    {
+        return $request->user() instanceof Authority;
+    }
+
     /**
      * Get all users (Authorities + Approved Students) with optional year filter
      */
     public function getAllUsers(Request $request)
     {
         try {
+            if (!$this->ensureAuthority($request)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $userType = $request->query('type', 'all'); // all, authorities, students
             $year = $request->query('year', date('Y')); // Filter by year, default current year
 
@@ -85,6 +97,13 @@ class UserController extends Controller
     public function getAvailableYears()
     {
         try {
+            if (!request()->user() instanceof Authority) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $years = DB::table('registration')
                 ->select('enrollmentYear')
                 ->where('status', 'Approved')
@@ -122,6 +141,13 @@ class UserController extends Controller
     public function getUser($userType, $id)
     {
         try {
+            if (!request()->user() instanceof Authority) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $currentYear = date('Y');
             
             if ($userType === 'authority') {
@@ -530,6 +556,13 @@ class UserController extends Controller
     public function getStudentRegistration($studentId)
     {
         try {
+            if (!request()->user() instanceof Authority) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden'
+                ], 403);
+            }
+
             $currentYear = date('Y');
             
             $registration = Registration::where('studentId', $studentId)

@@ -9,7 +9,7 @@ import {
   SearchOutlined, EyeOutlined, ReloadOutlined,
   UserOutlined, CalendarOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api/axios';
 import { getToken } from '../Utils/LocalStorage';
 import { apiUrl } from '../api';
 
@@ -26,7 +26,7 @@ const ViewApplications = () => {
   const fetchRegistrations = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(apiUrl('/api/registrations'), {
+      const res = await api.get('/api/registrations', {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.data.success) {
@@ -51,8 +51,8 @@ const ViewApplications = () => {
       onOk: async () => {
         setActionLoading(registrationId + 'Approved');
         try {
-          const res = await axios.patch(
-            apiUrl(`/api/registrations/${registrationId}/status`),
+          const res = await api.patch(
+            `/api/registrations/${registrationId}/status`,
             { status: 'Approved' },
             { headers: { Authorization: `Bearer ${getToken()}` } }
           );
@@ -89,8 +89,8 @@ const ViewApplications = () => {
       onOk: async () => {
         setActionLoading(registrationId + 'Rejected');
         try {
-          const res = await axios.patch(
-            apiUrl(`/api/registrations/${registrationId}/status`),
+          const res = await api.patch(
+            `/api/registrations/${registrationId}/status`,
             { status: 'Rejected' },
             { headers: { Authorization: `Bearer ${getToken()}` } }
           );

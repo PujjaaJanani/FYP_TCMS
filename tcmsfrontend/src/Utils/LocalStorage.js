@@ -12,10 +12,10 @@
  * @param {object} user  – the user object from response.data.data.user
  */
 export const saveAuth = (token, user) => {
-  localStorage.setItem('token',    token);
-  localStorage.setItem('user',     JSON.stringify(user));
-  localStorage.setItem('userType', user.userType);          // 'authority' | 'student'
-  localStorage.setItem('role',     user.role ?? 'student'); // 'Admin' | 'Staff' | 'student'
+  localStorage.setItem('token', token);
+  localStorage.setItem('user', JSON.stringify(user));
+  localStorage.removeItem('userType');
+  localStorage.removeItem('role');
 };
 
 // ─────────────────────────────────────────────
@@ -34,12 +34,12 @@ export const getUser = () => {
 /**
  * @returns {'authority'|'student'|null}
  */
-export const getUserType = () => localStorage.getItem('userType');
+export const getUserType = () => getUser()?.userType ?? null;
 
 /**
  * @returns {'Admin'|'Staff'|'student'|null}
  */
-export const getRole = () => localStorage.getItem('role');
+export const getRole = () => getUser()?.role ?? null;
 
 // ─────────────────────────────────────────────
 // ROLE CHECKS  (boolean helpers)
@@ -54,4 +54,9 @@ export const isLoggedIn = () => !!getToken();
 // CLEAR  (called on logout)
 // ─────────────────────────────────────────────
 
-export const clearAuth = () => localStorage.clear();
+export const clearAuth = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('userType');
+  localStorage.removeItem('role');
+};
